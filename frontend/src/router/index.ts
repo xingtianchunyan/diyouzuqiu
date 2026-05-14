@@ -1,0 +1,55 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import HomePage from '../views/HomePage.vue'
+import HistoryPage from '../views/HistoryPage.vue'
+import YearPage from '../views/YearPage.vue'
+import MediaPage from '../views/MediaPage.vue'
+import WorksPage from '../views/WorksPage.vue'
+import PeoplePage from '../views/PeoplePage.vue'
+import PersonPage from '../views/PersonPage.vue'
+import UploadPage from '../views/UploadPage.vue'
+import PlannerPage from '../views/PlannerPage.vue'
+import LoginPage from '../views/LoginPage.vue'
+import AdminUsersPage from '../views/AdminUsersPage.vue'
+import { useAuthStore } from '../stores/auth'
+
+export const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/login', name: 'login', component: LoginPage, meta: { public: true } },
+    { path: '/', name: 'home', component: HomePage },
+    { path: '/history', name: 'history', component: HistoryPage },
+    { path: '/history/:year(\\d{4})', name: 'year', component: YearPage, props: true },
+    { path: '/media', name: 'media', component: MediaPage },
+    { path: '/works', name: 'works', component: WorksPage },
+    { path: '/people', name: 'people', component: PeoplePage },
+    { path: '/people/:id', name: 'person', component: PersonPage, props: true },
+    { path: '/upload', name: 'upload', component: UploadPage },
+    { path: '/planner', name: 'planner', component: PlannerPage },
+    { path: '/admin/users', name: 'admin-users', component: AdminUsersPage, meta: { requiresAuth: true, requiresAdmin: true } },
+    {
+      path: '/knowledge',
+      name: 'Knowledge',
+      component: () => import('../views/KnowledgePage.vue')
+    }
+  ],
+})
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore()
+  const isAuthenticated = authStore.isAuthenticated
+
+  if (!isAuthenticated && !to.meta.public) {
+    return { name: 'login' }
+  }
+
+  if (isAuthenticated && to.name === 'login') {
+    return { name: 'home' }
+  }
+
+  if (to.meta.requiresAdmin && authStore.user?.role !== 'ADMIN') {
+    return { name: 'home' }
+  }
+
+  return true
+})
+

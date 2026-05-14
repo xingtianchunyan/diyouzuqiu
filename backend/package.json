@@ -1,0 +1,43 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test:ai": "tsx src/lib/ai/json.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/multipart": "^10.0.0",
+    "@fastify/static": "^9.1.0",
+    "@mozilla/readability": "^0.6.0",
+    "@prisma/client": "^6.7.0",
+    "axios": "^1.15.1",
+    "bcryptjs": "^3.0.2",
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.5.0",
+    "fastify": "^5.3.0",
+    "fastify-plugin": "^5.0.1",
+    "jsdom": "^29.0.2",
+    "mammoth": "^1.12.0",
+    "pdf-parse-new": "^2.0.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cheerio": "^0.22.35",
+    "@types/jsdom": "^28.0.1",
+    "@types/mozilla-readability": "^0.2.1",
+    "@types/node": "^24.12.2",
+    "@types/pdf-parse": "^1.1.5",
+    "prisma": "^6.7.0",
+    "tsx": "^4.20.5",
+    "typescript": "~6.0.2"
+  }
+}

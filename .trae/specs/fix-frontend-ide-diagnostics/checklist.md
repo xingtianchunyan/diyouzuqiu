@@ -1,0 +1,2 @@
+- [x] `frontend/tsconfig.app.json` 中的 `include` 模式已更新为使用 `./src/` 前缀。
+- [x] 验证通过 `GetDiagnostics` 读取 `ChroniclesList.vue` 和 `YearPage.vue` 不再抛出任何关于找不到在项目中的文件的 TS 错误。

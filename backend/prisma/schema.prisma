@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Removed enums for sqlite compatibility
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  role      String    @default("MEMBER")
+  memberId  String?   @unique
+  member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  createdMedia           MediaAsset[]
+  createdWorks           Work[]
+  createdKnowledgeDoc    KnowledgeDoc[]
+  createdChronicleEvents ChronicleEvent[]
+  createdMatches         Match[]
+  plannerProjects        PlannerProject[]
+  plannerChatMemories    PlannerChatMemory[]
+}
+
+model Family {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members Member[]
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  displayName String
+  team        String?
+  familyId    String?
+  avatarUrl   String?
+  isCaptain   Boolean  @default(false)
+  family      Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User?
+  mediaTags       MediaPersonTag[]
+  works           Work[]
+  mvpMatches      Match[]             @relation("MatchMvp")
+  matchRelations  MatchParticipant[]
+  chronicleEvents ChronicleEvent[]
+
+  @@index([team])
+  @@index([familyId])
+}
+
+model MediaAsset {
+  id               String           @id @default(cuid())
+  type             String
+  originalFilename String
+  storagePath      String
+  mimeType         String
+  sizeBytes        Int
+  takenAt          DateTime?
+  year             Int?
+  createdByUserId  String?
+  createdByUser    User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  personTags        MediaPersonTag[]
+  primaryChronicles ChronicleEvent[] @relation("ChroniclePrimaryMedia")
+  chronicleEvents   ChronicleEvent[] @relation("ChronicleMediaAssets")
+
+  @@index([type])
+  @@index([year])
+  @@index([takenAt])
+  @@index([createdAt])
+}
+
+model MediaPersonTag {
+  mediaId  String
+  memberId String
+  createdAt DateTime @default(now())
+
+  media  MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  member Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, memberId])
+  @@index([memberId])
+}
+
+model Work {
+  id              String    @id @default(cuid())
+  type            String
+  title           String
+  content         String
+  authorMemberId  String?
+  authorMember    Member?   @relation(fields: [authorMemberId], references: [id], onDelete: SetNull)
+  year            Int?
+  date            DateTime?
+  createdByUserId String?
+  createdByUser   User?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  chronicleEvents ChronicleEvent[]
+
+  @@index([type])
+  @@index([year])
+  @@index([authorMemberId])
+  @@index([createdAt])
+}
+
+model Match {
+  id          String      @id @default(cuid())
+  playedAt    DateTime
+  redScore    Int
+  blueScore   Int
+  mvpMemberId     String?
+  mvpMember       Member?     @relation("MatchMvp", fields: [mvpMemberId], references: [id], onDelete: SetNull)
+  notes           String?
+  createdByUserId String?
+  createdByUser   User?       @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  participants    MatchParticipant[]
+  chronicleEvents ChronicleEvent[]
+
+  @@index([playedAt])
+  @@index([mvpMemberId])
+  @@index([createdAt])
+}
+
+model MatchParticipant {
+  matchId  String
+  memberId String
+  side     String
+  createdAt DateTime @default(now())
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([matchId, memberId])
+  @@index([memberId])
+  @@index([side])
+}
+
+model YearEvent {
+  id          String   @id @default(cuid())
+  year        Int
+  happenedAt  DateTime?
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([year])
+}
+
+model ChronicleEvent {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  happenedAt      DateTime
+  year            Int
+  mediaId         String?
+  primaryMedia    MediaAsset? @relation("ChroniclePrimaryMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  createdByUser   User?       @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  members     Member[]
+  mediaAssets MediaAsset[] @relation("ChronicleMediaAssets")
+  works       Work[]
+  matches     Match[]
+
+  @@map("chronicle_events")
+  @@index([year])
+  @@index([happenedAt])
+}
+
+model KnowledgeDoc {
+  id               String          @id @default(cuid())
+  title            String
+  content          String
+  category         String          @default("GENERAL") // GENERAL, PLANNER_FILE, PLANNER_CHAT
+  plannerProjectId String?
+  plannerProject   PlannerProject? @relation(fields: [plannerProjectId], references: [id], onDelete: SetNull)
+  createdByUserId  String?
+  createdByUser    User?           @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  chunks           KnowledgeChunk[]
+
+  @@index([category])
+  @@index([plannerProjectId])
+}
+
+model PlannerProject {
+  id              String         @id @default(cuid())
+  name            String
+  year            Int
+  createdByUserId String?
+  createdByUser   User?          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  knowledgeDocs   KnowledgeDoc[]
+  chatMemories    PlannerChatMemory[]
+
+  @@index([year])
+}
+
+model PlannerChatMemory {
+  id              String         @id @default(cuid())
+  scopeKey        String         @unique
+  summary         String         @default("")
+  constraintsJson String?
+  plannerProjectId String?
+  plannerProject  PlannerProject? @relation(fields: [plannerProjectId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  createdByUser   User?          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([plannerProjectId])
+  @@index([createdByUserId])
+}
+
+model KnowledgeChunk {
+  id             String      @id @default(cuid())
+  knowledgeDocId String
+  knowledgeDoc   KnowledgeDoc @relation(fields: [knowledgeDocId], references: [id], onDelete: Cascade)
+  chunkIndex     Int
+  content        String
+  contentHash    String      @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([knowledgeDocId])
+}

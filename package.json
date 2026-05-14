@@ -1,0 +1,23 @@
+{
+  "name": "diyou-internal-site",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run -w frontend dev",
+    "dev:backend": "npm run -w backend dev",
+    "build:frontend": "npm run -w frontend build",
+    "build:backend": "npm run -w backend build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "resolutions": {
+    "serialize-javascript": "^7.0.5"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
+  }
+}
