@@ -9,8 +9,10 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
     const { year: yearParam } = request.params as { year: string }
     const yearInt = parseInt(yearParam, 10)
     
-    if (isNaN(yearInt)) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Invalid year' } })
+    const minYear = 2015
+    const maxYear = 2040
+    if (isNaN(yearInt) || yearInt < minYear || yearInt > maxYear) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Year not found' } })
     }
     
     // Fetch all related data for the year concurrently

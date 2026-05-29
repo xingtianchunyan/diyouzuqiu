@@ -58,6 +58,7 @@ app.register(async (api) => {
   await api.register(chroniclesRoutes)
   await api.register(usersRoutes, { prefix: '/admin/users' })
   await api.register(parseRoutes)
+  api.get('/health', async () => ({ ok: true }))
 }, { prefix: '/api/v1' })
 
 // Route for serving avatars manually
