@@ -30,7 +30,8 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
         playedAt: true,
         redScore: true,
         blueScore: true,
-        mvpMemberId: true
+        mvpMemberId: true,
+        createdByUserId: true
       },
       orderBy: { playedAt: 'desc' }
     })

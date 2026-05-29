@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma.js'
 
 export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
   // GET /chronicles/daily-materials
-  app.get('/daily-materials', async (request, reply) => {
+  app.get('/chronicles/daily-materials', async (request, reply) => {
     const { date } = request.query as { date?: string }
     if (!date) {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Date is required' } })
@@ -109,6 +109,7 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
         happenedAt: true,
         title: true,
         description: true,
+        createdByUserId: true,
         primaryMedia: {
           select: {
             id: true,

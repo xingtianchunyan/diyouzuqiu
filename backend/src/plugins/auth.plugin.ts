@@ -36,7 +36,7 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
     try {
       await request.jwtVerify()
       if (request.user.role !== 'ADMIN') {
-        reply.code(403).send({ message: 'Forbidden: Admin access required' })
+        reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'Admin access required' } })
       }
     } catch (err) {
       reply.send(err)

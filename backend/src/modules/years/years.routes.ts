@@ -23,6 +23,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           type: true,
           takenAt: true,
           year: true,
+          createdByUserId: true,
           storagePath: true,
           personTags: {
             include: {
@@ -45,6 +46,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           type: true,
           title: true,
           authorMemberId: true,
+          createdByUserId: true,
           year: true
         },
         orderBy: { createdAt: 'desc' }
@@ -64,6 +66,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           redScore: true,
           blueScore: true,
           mvpMemberId: true,
+          createdByUserId: true,
           mvpMember: {
             select: {
               id: true,
@@ -83,6 +86,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           happenedAt: true,
           title: true,
           description: true,
+          createdByUserId: true,
           primaryMedia: {
             select: {
               id: true,
@@ -170,6 +174,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
         type: m.type,
         takenAt: m.takenAt,
         year: m.year,
+        createdByUserId: m.createdByUserId,
         personTags: m.personTags.map((pt: any) => ({
           id: pt.memberId,
           displayName: pt.member.displayName
@@ -180,6 +185,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
         type: w.type,
         title: w.title,
         authorId: w.authorMemberId,
+        createdByUserId: w.createdByUserId,
         year: w.year
       })),
       matches,

@@ -7,17 +7,17 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const { email, password } = request.body as any
 
     if (!email || !password) {
-      return reply.code(400).send({ message: 'Email and password are required' })
+      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Email and password are required' } })
     }
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
-      return reply.code(401).send({ message: 'Invalid credentials' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid credentials' } })
     }
 
     const isValid = await bcrypt.compare(password, user.password)
     if (!isValid) {
-      return reply.code(401).send({ message: 'Invalid credentials' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid credentials' } })
     }
 
     const token = app.jwt.sign({ id: user.id, role: user.role, email: user.email, memberId: user.memberId })
@@ -37,7 +37,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post('/auth/refresh', async (request, reply) => {
     const auth = request.headers.authorization || ''
     if (!auth.startsWith('Bearer ')) {
-      return reply.code(401).send({ message: 'No Authorization was found in request.headers' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'No Authorization was found in request.headers' } })
     }
 
     const rawToken = auth.slice('Bearer '.length).trim()
@@ -45,7 +45,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     try {
       payload = app.jwt.verify(rawToken, { ignoreExpiration: true })
     } catch (err) {
-      return reply.code(401).send({ message: 'Invalid token' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid token' } })
     }
 
     const user = await prisma.user.findUnique({
@@ -72,7 +72,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     })
     
     if (!user) {
-      return reply.code(404).send({ message: 'User not found' })
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } })
     }
     
     return user
