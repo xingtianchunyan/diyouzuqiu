@@ -38,6 +38,7 @@ export const worksRoutes: FastifyPluginAsync = async (app) => {
         year: true,
         date: true,
         createdAt: true,
+        createdByUserId: true,
         authorMember: {
           select: {
             displayName: true
