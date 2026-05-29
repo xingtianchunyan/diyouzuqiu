@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 
 export const mediaRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/media', async (request, reply) => {
+  app.post('/media', { preValidation: [app.authenticate] }, async (request, reply) => {
     // We expect multipart form data
     const data = await request.file()
     if (!data) {

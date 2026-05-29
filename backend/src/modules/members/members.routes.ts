@@ -87,7 +87,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
   // PUT /members/:id
   app.put('/members/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { displayName, team, isCaptain, avatarUrl } = request.body as any
+    const { displayName, team, isCaptain, avatarUrl, familyId } = request.body as any
     const user = request.user
 
     const data: any = {}
@@ -97,6 +97,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       if (team !== undefined) data.team = team || null
       if (isCaptain !== undefined) data.isCaptain = isCaptain
       if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null
+      if (familyId !== undefined) data.familyId = familyId || null
     } else {
       if (user.memberId !== id) {
         return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You can only edit your own profile' } })

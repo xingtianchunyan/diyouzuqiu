@@ -34,7 +34,6 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
       where: { playedAt: { gte: startOfDay, lte: endOfDay } },
       select: { 
         id: true, 
-        title: true, 
         playedAt: true, 
         redScore: true, 
         blueScore: true,
