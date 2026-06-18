@@ -49,6 +49,29 @@ describe('Admin User Management', () => {
     expect(res.statusCode).toBe(400)
   })
 
+  it('POST /api/v1/admin/users/batch imports users, members and families', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/users/batch',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        users: [
+          { email: 'batch1@test.com', password: 'StrongPass1', role: 'MEMBER', memberName: 'Batch Member 1', team: 'RED', familyName: 'Batch Family' },
+          { email: 'batch2@test.com', password: 'StrongPass1', role: 'MEMBER', memberName: 'Batch Member 2', team: 'BLUE', familyName: 'Batch Family' },
+          { email: 'batch3@test.com', password: 'StrongPass1', role: 'ADMIN' }
+        ]
+      }
+    })
+    expect(res.statusCode).toBe(200)
+    const json = res.json()
+    expect(json.success).toBe(true)
+    expect(json.summary.total).toBe(3)
+    expect(json.summary.created).toBe(3)
+    expect(json.summary.createdMembers).toBe(2)
+    expect(json.summary.createdFamilies).toBe(1)
+    expect(json.summary.failed).toHaveLength(0)
+  })
+
   it('POST /api/v1/auth/change-password works with correct current password', async () => {
     const createRes = await app.inject({
       method: 'POST',

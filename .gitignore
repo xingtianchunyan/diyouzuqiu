@@ -11,3 +11,4 @@ backend/storage/
 *.db-wal
 *.db-shm
 backend/tests/storage/
+*.log

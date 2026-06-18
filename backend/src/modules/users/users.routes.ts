@@ -26,6 +26,19 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8)
 })
 
+const batchCreateUsersSchema = z.object({
+  users: z.array(
+    z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      role: z.enum(['ADMIN', 'MEMBER']).optional(),
+      memberName: z.string().optional(),
+      team: z.string().optional(),
+      familyName: z.string().optional()
+    })
+  ).min(1).max(200)
+})
+
 export const usersRoutes: FastifyPluginAsync = async (app) => {
   // All user routes require ADMIN role
   app.addHook('preHandler', app.requireAdmin)
@@ -78,6 +91,97 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     })
 
     return { id: user.id, email: user.email, role: user.role, memberId: user.memberId }
+  })
+
+  app.post('/batch', { preValidation: validateBody(batchCreateUsersSchema) }, async (request, reply) => {
+    const { users } = (request as any).validatedBody as {
+      users: Array<{
+        email: string
+        password: string
+        role?: 'ADMIN' | 'MEMBER'
+        memberName?: string
+        team?: string
+        familyName?: string
+      }>
+    }
+
+    const summary = await prisma.$transaction(async (tx) => {
+      const existingMembers = await tx.member.findMany({
+        include: { family: { select: { label: true } } }
+      })
+      const memberMap = new Map<string, any>(existingMembers.map((m) => [m.displayName, m]))
+      const existingFamilies = await tx.family.findMany()
+      const familyMap = new Map<string, any>(existingFamilies.map((f) => [f.label, f]))
+
+      const result = {
+        total: users.length,
+        created: 0,
+        createdMembers: 0,
+        createdFamilies: 0,
+        failed: [] as Array<{ row: number; email: string; reason: string }>
+      }
+
+      for (const [index, row] of users.entries()) {
+        try {
+          const passwordCheck = validatePassword(row.password)
+          if (!passwordCheck.valid) {
+            throw new Error(passwordCheck.message)
+          }
+
+          const existingUser = await tx.user.findUnique({ where: { email: row.email } })
+          if (existingUser) {
+            throw new Error('Email already exists')
+          }
+
+          let memberId: string | null = null
+          const memberName = row.memberName?.trim()
+          if (memberName) {
+            let member = memberMap.get(memberName)
+            if (!member) {
+              const familyName = row.familyName?.trim()
+              let familyId: string | null = null
+              if (familyName) {
+                let family = familyMap.get(familyName)
+                if (!family) {
+                  family = await tx.family.create({ data: { label: familyName } })
+                  familyMap.set(familyName, family)
+                  result.createdFamilies++
+                }
+                familyId = family.id
+              }
+
+              const rawTeam = row.team?.trim().toUpperCase()
+              const team = rawTeam === 'RED' || rawTeam === 'BLUE' ? rawTeam : null
+
+              member = await tx.member.create({
+                data: { displayName: memberName, familyId, team }
+              })
+              memberMap.set(memberName, member)
+              result.createdMembers++
+            }
+            memberId = member.id
+          }
+
+          const hashedPassword = await bcrypt.hash(row.password, 10)
+          await tx.user.create({
+            data: {
+              email: row.email,
+              password: hashedPassword,
+              role: row.role || 'MEMBER',
+              memberId
+            }
+          })
+
+          result.created++
+        } catch (err: any) {
+          result.failed.push({ row: index + 1, email: row.email, reason: err.message })
+        }
+      }
+
+      return result
+    })
+
+    return reply.code(200).send({ success: summary.failed.length === 0, summary })
   })
 
   app.put('/:id', { preValidation: [validateParams(userIdParamsSchema), validateBody(updateUserSchema)] }, async (request, reply) => {

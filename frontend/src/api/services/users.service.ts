@@ -16,6 +16,15 @@ export const usersService = {
   createUser(data: any) {
     return apiClient.post<User>('/admin/users', data)
   },
+  batchCreateUsers(data: { users: any[] }) {
+    return apiClient.post<{ success: boolean; summary: {
+      total: number
+      created: number
+      createdMembers: number
+      createdFamilies: number
+      failed: Array<{ row: number; email: string; reason: string }>
+    } }>('/admin/users/batch', data)
+  },
   updateUser(id: string, data: any) {
     return apiClient.put<User>(`/admin/users/${id}`, data)
   },

@@ -108,9 +108,10 @@ const matchForm = ref({
 })
 
 // Chronicle Form
+const todayYmd = new Date().toISOString().slice(0, 10)
 const chronicleForm = ref({
   title: '',
-  happenedAt: '',
+  happenedAt: todayYmd,
   description: '',
   file: null as File | null,
   memberIds: [] as string[],
@@ -120,6 +121,7 @@ const chronicleForm = ref({
   poemIds: [] as string[],
   matchIds: [] as string[]
 })
+const showChronicleAdvanced = ref(false)
 
 // Dropdown Options
 const teamOptions = [
@@ -436,9 +438,10 @@ const submitChronicle = async () => {
     
     showMessage('success', t('upload.success'))
     chronicleForm.value = { 
-      title: '', happenedAt: '', description: '', file: null, 
+      title: '', happenedAt: new Date().toISOString().slice(0, 10), description: '', file: null, 
       memberIds: [], photoIds: [], videoIds: [], articleIds: [], poemIds: [], matchIds: [] 
     }
+    showChronicleAdvanced.value = false
     const fileInputs = document.querySelectorAll('input[type="file"]')
     fileInputs.forEach(input => (input as HTMLInputElement).value = '')
   } catch (e: any) {
@@ -671,37 +674,36 @@ watch(currentTab, async () => {
           @update:selection="handleChronicleSelection" 
         />
 
-        <div class="divider-y"></div>
-        <p class="editorial-subtitle">ASSOCIATIONS</p>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED MEMBERS</label>
-          <OrganicDropdown v-model="chronicleForm.memberIds" :options="memberOptions" :multiple="true" placeholder="Select members..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED PHOTOS</label>
-          <OrganicDropdown v-model="chronicleForm.photoIds" :options="photoOptions" :multiple="true" placeholder="Select photos..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED VIDEOS</label>
-          <OrganicDropdown v-model="chronicleForm.videoIds" :options="videoOptions" :multiple="true" placeholder="Select videos..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED ARTICLES</label>
-          <OrganicDropdown v-model="chronicleForm.articleIds" :options="articleOptions" :multiple="true" placeholder="Select articles..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED POEMS</label>
-          <OrganicDropdown v-model="chronicleForm.poemIds" :options="poemOptions" :multiple="true" placeholder="Select poems..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">ASSOCIATED MATCHES</label>
-          <OrganicDropdown v-model="chronicleForm.matchIds" :options="matchOptions" :multiple="true" placeholder="Select matches..." />
+        <div class="advanced-section">
+          <button type="button" class="advanced-toggle" @click="showChronicleAdvanced = !showChronicleAdvanced">
+            {{ showChronicleAdvanced ? '收起高级关联' : '展开高级关联（可选）' }}
+          </button>
+          <div v-if="showChronicleAdvanced" class="advanced-fields">
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED MEMBERS</label>
+              <OrganicDropdown v-model="chronicleForm.memberIds" :options="memberOptions" :multiple="true" placeholder="Select members..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED PHOTOS</label>
+              <OrganicDropdown v-model="chronicleForm.photoIds" :options="photoOptions" :multiple="true" placeholder="Select photos..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED VIDEOS</label>
+              <OrganicDropdown v-model="chronicleForm.videoIds" :options="videoOptions" :multiple="true" placeholder="Select videos..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED ARTICLES</label>
+              <OrganicDropdown v-model="chronicleForm.articleIds" :options="articleOptions" :multiple="true" placeholder="Select articles..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED POEMS</label>
+              <OrganicDropdown v-model="chronicleForm.poemIds" :options="poemOptions" :multiple="true" placeholder="Select poems..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ASSOCIATED MATCHES</label>
+              <OrganicDropdown v-model="chronicleForm.matchIds" :options="matchOptions" :multiple="true" placeholder="Select matches..." />
+            </div>
+          </div>
         </div>
 
         <button type="submit" class="editorial-btn" :disabled="loading">
@@ -953,5 +955,35 @@ watch(currentTab, async () => {
 .alert-error {
   border-color: var(--error);
   color: var(--error);
+}
+
+.advanced-section {
+  margin-top: 2rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+}
+
+.advanced-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.advanced-toggle:hover {
+  color: var(--text-h);
+}
+
+.advanced-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-top: 1.5rem;
 }
 </style>

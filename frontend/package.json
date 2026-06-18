@@ -13,15 +13,18 @@
     "dompurify": "^3.4.1",
     "exifreader": "^4.38.1",
     "marked": "^18.0.2",
+    "papaparse": "^5.5.3",
     "pinia": "^3.0.4",
     "vue": "^3.5.32",
     "vue-i18n": "^11.3.2",
-    "vue-router": "^5.0.4"
+    "vue-router": "^5.0.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/marked": "^5.0.2",
     "@types/node": "^24.12.2",
+    "@types/papaparse": "^5.5.2",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",

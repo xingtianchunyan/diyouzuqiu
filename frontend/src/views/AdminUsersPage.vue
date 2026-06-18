@@ -5,9 +5,14 @@
       <h1 class="editorial-title delay-2 animate-slide-up">账号管理</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
         <p class="editorial-subtitle">管理所有登录用户及其关联的队员身份</p>
-        <button class="action-btn" @click="openModal()">
-          + 添加用户
-        </button>
+        <div class="header-actions">
+          <button class="action-btn" @click="openBatchModal">
+            批量导入
+          </button>
+          <button class="action-btn" @click="openModal()">
+            + 添加用户
+          </button>
+        </div>
       </div>
     </div>
 
@@ -36,40 +41,52 @@
     </div>
 
     <!-- Modal -->
-    <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
-      <div class="modal-content">
-        <h2>{{ editingUser ? '编辑用户' : '新增用户' }}</h2>
-        <form @submit.prevent="handleSubmit" class="editorial-form">
-          <div class="form-group">
-            <label class="form-label">EMAIL</label>
-            <input v-model="form.email" type="email" class="form-input" required />
+    <Transition name="fade">
+      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h2 class="modal-title">{{ editingUser ? '编辑用户' : '新增用户' }}</h2>
+            <button type="button" class="close-btn" @click="closeModal">&times;</button>
           </div>
-          <div class="form-group">
-            <label class="form-label">PASSWORD</label>
-            <input v-model="form.password" type="password" class="form-input" :placeholder="editingUser ? '留空表示不修改' : '必填'" :required="!editingUser" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">ROLE</label>
-            <select v-model="form.role" class="form-input">
-              <option value="MEMBER">MEMBER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">绑定队员</label>
-            <select v-model="form.memberId" class="form-input">
-              <option value="">-- 不绑定 --</option>
-              <option v-for="m in members" :key="m.id" :value="m.id">{{ m.displayName }}</option>
-            </select>
-          </div>
-          
-          <div class="form-actions">
-            <button type="button" class="btn-text" @click="closeModal">取消</button>
-            <button type="submit" class="editorial-btn">保存</button>
-          </div>
-        </form>
+
+          <form @submit.prevent="handleSubmit" class="editorial-form">
+            <div class="form-group">
+              <label class="form-label">邮箱</label>
+              <input v-model="form.email" type="email" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">密码</label>
+              <input v-model="form.password" type="password" class="form-input" :placeholder="editingUser ? '留空表示不修改' : '必填'" :required="!editingUser" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">角色</label>
+              <select v-model="form.role" class="form-input">
+                <option value="MEMBER">MEMBER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">绑定队员</label>
+              <select v-model="form.memberId" class="form-input">
+                <option value="">-- 不绑定 --</option>
+                <option v-for="m in members" :key="m.id" :value="m.id">{{ m.displayName }}</option>
+              </select>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="editorial-btn secondary" @click="closeModal">取消</button>
+              <button type="submit" class="editorial-btn">保存</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </Transition>
+
+    <BatchUserImportModal
+      :show="showBatchModal"
+      @close="closeBatchModal"
+      @imported="onBatchImported"
+    />
   </main>
 </template>
 
@@ -78,6 +95,7 @@ import { ref, onMounted } from 'vue'
 import { usersService, type User } from '../api/services/users.service'
 import { membersService, type Member } from '../api/services/members.service'
 import { useAuthStore } from '../stores/auth'
+import BatchUserImportModal from '../components/users/BatchUserImportModal.vue'
 
 const authStore = useAuthStore()
 const loading = ref(true)
@@ -85,6 +103,7 @@ const users = ref<User[]>([])
 const members = ref<Member[]>([])
 
 const showModal = ref(false)
+const showBatchModal = ref(false)
 const editingUser = ref<User | null>(null)
 const form = ref({
   email: '',
@@ -136,6 +155,19 @@ const openModal = (u?: User) => {
 
 const closeModal = () => {
   showModal.value = false
+}
+
+const openBatchModal = () => {
+  showBatchModal.value = true
+}
+
+const closeBatchModal = () => {
+  showBatchModal.value = false
+}
+
+const onBatchImported = () => {
+  closeBatchModal()
+  loadData()
 }
 
 const handleSubmit = async () => {
@@ -209,34 +241,162 @@ const handleDelete = async (id: string) => {
 
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.5);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  padding: 1rem;
   backdrop-filter: blur(4px);
 }
+
 .modal-content {
   background: var(--surface);
+  border: 1px solid var(--border-strong);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 2rem;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-whisper);
 }
-.modal-content h2 {
-  margin-top: 0;
-  margin-bottom: 1.5rem;
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.75rem;
   font-weight: 400;
+  color: var(--text-h);
 }
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.3s ease;
+}
+
+.close-btn:hover {
+  color: var(--text-h);
+}
+
+.editorial-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: 0;
+  font-family: var(--sans);
+  font-size: 1.1rem;
+  color: var(--text-h);
+  padding: 0.6rem 0;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  border-bottom-color: var(--text-h);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+select.form-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  padding-right: 1.5rem;
+}
+
 .form-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 1rem;
-  margin-top: 2rem;
+  margin-top: 1rem;
+}
+
+.editorial-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--text-h);
+  padding: 1rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.editorial-btn:hover {
+  background: var(--text-h);
+  color: var(--surface);
+}
+
+.editorial-btn.secondary {
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+
+.editorial-btn.secondary:hover {
+  background: var(--border-strong);
+  color: var(--text-h);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 1.5rem;
+  }
+  .modal-title {
+    font-size: 1.5rem;
+  }
 }
 </style>
