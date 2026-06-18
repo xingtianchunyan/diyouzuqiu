@@ -6,3 +6,8 @@
 **/.DS_Store
 backend/uploads/
 backend/storage/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/tests/storage/

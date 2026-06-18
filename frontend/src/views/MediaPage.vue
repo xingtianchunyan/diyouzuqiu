@@ -7,6 +7,7 @@ import BaseEmptyState from '../components/base/EmptyState.vue'
 import OrganicDropdown from '../components/base/OrganicDropdown.vue'
 import MediaGallery from '../components/media/MediaGallery.vue'
 import MediaLightbox from '../components/media/MediaLightbox.vue'
+import MediaEditModal from '../components/media/MediaEditModal.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -27,6 +28,17 @@ const currentYear = new Date().getFullYear()
 const years = Array.from({ length: Math.max(2026, currentYear) - 2015 + 1 }, (_, i) => Math.max(2026, currentYear) - i)
 
 const selectedMedia = ref<Media | null>(null)
+const editingMedia = ref<Media | null>(null)
+
+const handleUpdatedMedia = (updated: Media) => {
+  const index = mediaList.value.findIndex(m => m.id === updated.id)
+  if (index !== -1) {
+    mediaList.value[index] = { ...mediaList.value[index], ...updated }
+  }
+  if (selectedMedia.value?.id === updated.id) {
+    selectedMedia.value = { ...selectedMedia.value, ...updated }
+  }
+}
 
 const yearOptions = computed(() => {
   return [
@@ -54,7 +66,7 @@ const fetchPersons = async () => {
     const res = await membersService.getMembers()
     persons.value = res.data.map(m => ({ id: m.id, name: m.displayName }))
   } catch (error) {
-    console.error('Failed to fetch persons', error)
+    // Silent: person filter will be empty
   }
 }
 
@@ -70,8 +82,7 @@ const fetchMedia = async () => {
     const res = await mediaService.getMediaList(params)
     mediaList.value = res.data
   } catch (err: any) {
-    console.error('Failed to fetch media', err)
-    error.value = err.message || 'Failed to load media'
+    error.value = err.response?.data?.error?.message || err.message || 'Failed to load media'
   } finally {
     loading.value = false
   }
@@ -161,6 +172,7 @@ const handleDeleteMedia = async (mediaId: string) => {
       :can-delete="canDeleteMedia"
       @select="selectedMedia = $event"
       @delete="handleDeleteMedia"
+      @edit="editingMedia = $event"
     />
 
     <div v-else class="empty-archive delay-4 animate-slide-up">
@@ -172,6 +184,12 @@ const handleDeleteMedia = async (mediaId: string) => {
   <MediaLightbox
     :media="selectedMedia"
     @close="selectedMedia = null"
+  />
+
+  <MediaEditModal
+    :media="editingMedia"
+    @close="editingMedia = null"
+    @updated="handleUpdatedMedia"
   />
 </template>
 

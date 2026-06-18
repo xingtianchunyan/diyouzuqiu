@@ -1,40 +1,88 @@
 <template>
   <div class="smart-import-panel">
     <div class="import-header">
-      <h3>智能导入区域</h3>
-      <p class="import-desc">支持输入网页URL自动抓取，或上传文档进行解析提取（暂不包括图片/视频 OCR）</p>
+      <h3>智能导入</h3>
+      <p class="import-desc">支持微信公众号链接、网页链接、粘贴网页源码或上传文档自动提取正文</p>
+    </div>
+
+    <div class="import-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.value"
+        type="button"
+        class="import-tab"
+        :class="{ active: activeTab === tab.value }"
+        @click="activeTab = tab.value"
+      >
+        {{ tab.label }}
+      </button>
     </div>
 
     <div class="import-body">
-      <div class="import-row">
-        <input 
-          type="url" 
-          v-model="url" 
-          class="form-input" 
-          placeholder="https://... (输入网页链接)"
-          @keyup.enter="handleUrlParse"
-        />
-        <button type="button" class="editorial-btn small" @click="handleUrlParse" :disabled="loading || !url">
-          {{ loading && !file ? '解析中...' : '解析URL' }}
-        </button>
+      <!-- URL -->
+      <div v-if="activeTab === 'url'" class="import-section">
+        <div class="import-row">
+          <input
+            type="url"
+            v-model="url"
+            class="form-input"
+            placeholder="https://mp.weixin.qq.com/s/... 或任意网页链接"
+            @keyup.enter="handleUrlParse"
+          />
+          <button
+            type="button"
+            class="editorial-btn small"
+            @click="handleUrlParse"
+            :disabled="loading || !url.trim()"
+          >
+            {{ loading ? '解析中...' : '解析链接' }}
+          </button>
+        </div>
+        <small class="hint">微信公众号文章会自动识别标题、作者、发布时间和正文</small>
       </div>
-      
-      <div class="import-divider"><span>OR</span></div>
 
-      <div class="import-row file-row">
-        <input 
-          type="file" 
+      <!-- Paste HTML -->
+      <div v-else-if="activeTab === 'html'" class="import-section">
+        <textarea
+          v-model="htmlSource"
+          class="form-textarea html-paste"
+          rows="6"
+          placeholder="在此处粘贴网页 HTML 源码（右键网页 → 查看网页源代码 → 全选复制）"
+        ></textarea>
+        <button
+          type="button"
+          class="editorial-btn small"
+          @click="handleHtmlParse"
+          :disabled="loading || !htmlSource.trim()"
+        >
+          {{ loading ? '解析中...' : '解析源码' }}
+        </button>
+        <small class="hint">当链接抓取失败时，粘贴源码是最稳定的方式</small>
+      </div>
+
+      <!-- File -->
+      <div v-else-if="activeTab === 'file'" class="import-section">
+        <input
+          type="file"
           ref="fileInput"
-          @change="handleFileParse" 
-          accept=".pdf,.doc,.docx,text/plain" 
+          @change="handleFileParse"
+          accept=".pdf,.doc,.docx,text/plain"
           style="display: none"
         />
-        <button type="button" class="editorial-btn outline small" @click="triggerFileInput" :disabled="loading">
-          {{ loading && file ? '解析中...' : '选择本地文件 (PDF/Word/TXT)' }}
-        </button>
-        <span v-if="file" class="file-name">{{ file.name }}</span>
+        <div class="file-row">
+          <button
+            type="button"
+            class="editorial-btn outline small"
+            @click="triggerFileInput"
+            :disabled="loading"
+          >
+            {{ loading ? '解析中...' : '选择本地文件 (PDF / Word / TXT)' }}
+          </button>
+          <span v-if="file" class="file-name">{{ file.name }}</span>
+        </div>
       </div>
     </div>
+
     <div v-if="error" class="import-error">{{ error }}</div>
   </div>
 </template>
@@ -51,7 +99,15 @@ const emit = defineEmits<{
   (e: 'parsed', data: ParsedData): void
 }>()
 
+const tabs = [
+  { label: '链接导入', value: 'url' },
+  { label: '粘贴源码', value: 'html' },
+  { label: '上传文件', value: 'file' }
+] as const
+
+const activeTab = ref<'url' | 'html' | 'file'>('url')
 const url = ref('')
+const htmlSource = ref('')
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const loading = ref(false)
@@ -62,16 +118,30 @@ const triggerFileInput = () => {
 }
 
 const handleUrlParse = async () => {
-  if (!url.value) return
+  if (!url.value.trim()) return
   loading.value = true
   error.value = ''
-  file.value = null // reset file
   try {
-    const res = await parseService.parse({ url: url.value, targetType: props.targetType })
+    const res = await parseService.parse({ url: url.value.trim(), targetType: props.targetType })
     emit('parsed', res.data)
-    url.value = '' // clear after success
+    url.value = ''
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || 'URL 解析失败，请检查链接'
+    error.value = err.response?.data?.error?.message || '链接解析失败，请尝试“粘贴源码”模式'
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleHtmlParse = async () => {
+  if (!htmlSource.value.trim()) return
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await parseService.parse({ html: htmlSource.value, targetType: props.targetType })
+    emit('parsed', res.data)
+    htmlSource.value = ''
+  } catch (err: any) {
+    error.value = err.response?.data?.error?.message || '源码解析失败'
   } finally {
     loading.value = false
   }
@@ -80,17 +150,16 @@ const handleUrlParse = async () => {
 const handleFileParse = async (e: Event) => {
   const target = e.target as HTMLInputElement
   if (!target.files || target.files.length === 0) return
-  
+
   file.value = target.files[0]
-  url.value = '' // reset url
   loading.value = true
   error.value = ''
 
   try {
     const res = await parseService.parse({ file: file.value, targetType: props.targetType })
     emit('parsed', res.data)
-    file.value = null // clear after success
-    target.value = '' // reset input
+    file.value = null
+    target.value = ''
   } catch (err: any) {
     error.value = err.response?.data?.error?.message || '文件解析失败，仅支持 PDF, Word 或纯文本'
   } finally {
@@ -117,10 +186,41 @@ const handleFileParse = async (e: Event) => {
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+.import-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.import-tab {
+  background: transparent;
+  border: none;
+  padding: 0.6rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+.import-tab:hover {
+  color: var(--text-h);
+}
+.import-tab.active {
+  color: var(--text-h);
+  border-bottom-color: var(--text-h);
+}
+
 .import-body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+.import-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 .import-row {
   display: flex;
@@ -128,52 +228,90 @@ const handleFileParse = async (e: Event) => {
   align-items: center;
 }
 .file-row {
-  justify-content: flex-start;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 .form-input {
   flex: 1;
   background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 0.6rem 0.75rem;
+  font-family: var(--sans);
+  font-size: 1rem;
+  color: var(--text-h);
+  outline: none;
 }
-.import-divider {
-  text-align: center;
-  position: relative;
+.form-input:focus {
+  border-color: var(--text-h);
+}
+.form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-h);
+  resize: vertical;
+  outline: none;
+}
+.form-textarea:focus {
+  border-color: var(--text-h);
+}
+.html-paste {
+  min-height: 140px;
+}
+
+.hint {
+  font-size: 0.75rem;
   color: var(--text-muted);
-  font-size: 0.8rem;
-  margin: 0.5rem 0;
+  font-family: var(--sans);
 }
-.import-divider::before, .import-divider::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 45%;
-  height: 1px;
-  background: var(--border);
-}
-.import-divider::before { left: 0; }
-.import-divider::after { right: 0; }
+
 .file-name {
   font-size: 0.85rem;
   color: var(--text-muted);
-  max-width: 200px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .import-error {
   margin-top: 1rem;
-  color: #e53935;
+  color: var(--error, #e53935);
   font-size: 0.85rem;
 }
+
 .editorial-btn.small {
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--text-h);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.editorial-btn.small:hover:not(:disabled) {
+  background: var(--text-h);
+  color: var(--surface);
+}
+.editorial-btn.small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .editorial-btn.outline {
-  background: transparent;
+  border-color: var(--border-strong);
   color: var(--text);
-  border: 1px solid var(--border-strong);
 }
-.editorial-btn.outline:hover {
+.editorial-btn.outline:hover:not(:disabled) {
   background: var(--text);
   color: var(--surface);
 }

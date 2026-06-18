@@ -1,5 +1,10 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
+import { validateBody, z } from '../../lib/validate.js'
+
+const createFamilySchema = z.object({
+  label: z.string().min(1).max(100)
+})
 
 export const familiesRoutes: FastifyPluginAsync = async (app) => {
   // GET /families
@@ -12,12 +17,9 @@ export const familiesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /families (ADMIN)
-  app.post('/families', { preValidation: [app.requireAdmin] }, async (request, reply) => {
-    const { label } = request.body as { label?: string }
-    if (!label) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Label is required' } })
-    }
-    
+  app.post('/families', { preValidation: [app.requireAdmin, validateBody(createFamilySchema)] }, async (request, reply) => {
+    const { label } = (request as any).validatedBody as { label: string }
+
     try {
       const family = await prisma.family.create({
         data: { label },

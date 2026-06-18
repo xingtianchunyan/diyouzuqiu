@@ -18,7 +18,7 @@ onMounted(async () => {
     try {
       await authStore.fetchCurrentUser()
     } catch (err) {
-      console.warn('Failed to fetch user', err)
+      // Silent: auth guard will redirect if needed
     }
   }
 })

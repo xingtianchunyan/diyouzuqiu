@@ -3,7 +3,9 @@ import HomePage from '../views/HomePage.vue'
 import HistoryPage from '../views/HistoryPage.vue'
 import YearPage from '../views/YearPage.vue'
 import MediaPage from '../views/MediaPage.vue'
+import MediaDetailPage from '../views/MediaDetailPage.vue'
 import WorksPage from '../views/WorksPage.vue'
+import WorkDetailPage from '../views/WorkDetailPage.vue'
 import PeoplePage from '../views/PeoplePage.vue'
 import PersonPage from '../views/PersonPage.vue'
 import UploadPage from '../views/UploadPage.vue'
@@ -20,7 +22,9 @@ export const router = createRouter({
     { path: '/history', name: 'history', component: HistoryPage },
     { path: '/history/:year(\\d{4})', name: 'year', component: YearPage, props: true },
     { path: '/media', name: 'media', component: MediaPage },
+    { path: '/media/:id', name: 'media-detail', component: MediaDetailPage, props: true },
     { path: '/works', name: 'works', component: WorksPage },
+    { path: '/works/:id', name: 'work-detail', component: WorkDetailPage, props: true },
     { path: '/people', name: 'people', component: PeoplePage },
     { path: '/people/:id', name: 'person', component: PersonPage, props: true },
     { path: '/upload', name: 'upload', component: UploadPage },

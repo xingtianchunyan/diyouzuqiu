@@ -7,7 +7,7 @@ export const useMembersStore = defineStore('members', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const fetchMembers = async (params?: { team?: 'RED' | 'BLUE' }) => {
+  const fetchMembers = async (params?: { team?: 'RED' | 'BLUE'; familyId?: string }) => {
     loading.value = true
     error.value = null
     try {

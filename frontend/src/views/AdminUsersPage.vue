@@ -46,7 +46,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">PASSWORD</label>
-            <input v-model="form.password" type="text" class="form-input" :placeholder="editingUser ? '留空表示不修改' : '必填'" :required="!editingUser" />
+            <input v-model="form.password" type="password" class="form-input" :placeholder="editingUser ? '留空表示不修改' : '必填'" :required="!editingUser" />
           </div>
           <div class="form-group">
             <label class="form-label">ROLE</label>
@@ -103,7 +103,7 @@ const loadData = async () => {
     users.value = uRes.data
     members.value = mRes.data
   } catch (err) {
-    console.error(err)
+    // Silent: table will be empty
   } finally {
     loading.value = false
   }

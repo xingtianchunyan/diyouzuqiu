@@ -5,10 +5,11 @@ export interface ParsedData {
   content: string
   date: string
   description: string
+  author?: string
 }
 
 export const parseService = {
-  parse(data: { file?: File; url?: string; targetType?: string }) {
+  parse(data: { file?: File; url?: string; html?: string; targetType?: string }) {
     if (data.file) {
       const formData = new FormData()
       if (data.targetType) {
@@ -16,13 +17,13 @@ export const parseService = {
       }
       formData.append('file', data.file)
       return apiClient.post<ParsedData>('/parse', formData)
-    } else if (data.url) {
-      const payload: any = { url: data.url }
-      if (data.targetType) {
-        payload.targetType = data.targetType
-      }
+    } else if (data.url || typeof data.html === 'string') {
+      const payload: any = {}
+      if (data.url) payload.url = data.url
+      if (typeof data.html === 'string') payload.html = data.html
+      if (data.targetType) payload.targetType = data.targetType
       return apiClient.post<ParsedData>('/parse', payload)
     }
-    throw new Error('Either file or url must be provided')
+    throw new Error('Either file, url or html must be provided')
   }
 }

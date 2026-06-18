@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Timeline from '../components/Timeline.vue'
+import { yearsService } from '../api/services/years.service'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -14,15 +15,33 @@ const baseEndYear = Math.max(2026, currentYear)
 const maxFutureYear = 2040
 
 const currentEndYear = ref(baseEndYear)
+const yearsWithData = ref<Set<number>>(new Set())
+const loadingOverview = ref(false)
 
 const nodes = computed(() => {
   return Array.from({ length: currentEndYear.value - startYear + 1 }, (_, i) => {
     const year = currentEndYear.value - i
     return {
       year,
-      hasData: true // TODO: determine this from API
+      hasData: yearsWithData.value.has(year)
     }
   })
+})
+
+const fetchOverview = async () => {
+  loadingOverview.value = true
+  try {
+    const res = await yearsService.getYearsOverview()
+    yearsWithData.value = new Set(res.data.years)
+  } catch (err) {
+    // Silent: all years will appear without data indicator
+  } finally {
+    loadingOverview.value = false
+  }
+}
+
+onMounted(() => {
+  fetchOverview()
 })
 
 const addFutureYear = () => {

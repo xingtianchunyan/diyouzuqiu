@@ -3,29 +3,73 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useMembersStore } from '../stores/members'
+import { useFamiliesStore } from '../stores/families'
 import OrganicDropdown from '../components/base/OrganicDropdown.vue'
 
 const { t } = useI18n()
 const router = useRouter()
 const membersStore = useMembersStore()
+const familiesStore = useFamiliesStore()
 
-const selectedTeam = ref<string>('ALL')
+const selectedFamily = ref<string>('')
+const selectedRedTeam = ref<string>('')
+const selectedBlueTeam = ref<string>('')
 
-const teamOptions = computed(() => [
-  { label: t('people.all'), value: 'ALL' },
-  { label: t('people.red'), value: 'RED' },
-  { label: t('people.blue'), value: 'BLUE' }
+const familyById = computed(() => {
+  const map: Record<string, string> = {}
+  for (const f of familiesStore.families) {
+    map[f.id] = f.label
+  }
+  return map
+})
+
+const familyOptions = computed(() => [
+  { label: t('people.allFamilies') || 'All Families', value: '' },
+  ...familiesStore.families.map(f => ({ label: f.label, value: f.id }))
 ])
+
+const redTeamOptions = computed(() => [
+  { label: t('people.allRed') || 'All Red', value: '' },
+  { label: t('people.red') || 'Red Team', value: 'RED' }
+])
+
+const blueTeamOptions = computed(() => [
+  { label: t('people.allBlue') || 'All Blue', value: '' },
+  { label: t('people.blue') || 'Blue Team', value: 'BLUE' }
+])
+
+const activeTeam = computed(() => {
+  if (selectedRedTeam.value) return selectedRedTeam.value
+  if (selectedBlueTeam.value) return selectedBlueTeam.value
+  return undefined
+})
 
 const loadMembers = () => {
   const params: any = {}
-  if (selectedTeam.value && selectedTeam.value !== 'ALL') {
-    params.team = selectedTeam.value
+  if (selectedFamily.value) {
+    params.familyId = selectedFamily.value
+  }
+  if (activeTeam.value) {
+    params.team = activeTeam.value
   }
   membersStore.fetchMembers(params)
 }
 
-const onFilterChange = () => {
+const onFamilyChange = () => {
+  loadMembers()
+}
+
+const onRedTeamChange = () => {
+  if (selectedRedTeam.value) {
+    selectedBlueTeam.value = ''
+  }
+  loadMembers()
+}
+
+const onBlueTeamChange = () => {
+  if (selectedBlueTeam.value) {
+    selectedRedTeam.value = ''
+  }
   loadMembers()
 }
 
@@ -34,6 +78,7 @@ const goToPerson = (id: string) => {
 }
 
 onMounted(() => {
+  familiesStore.fetchFamilies()
   loadMembers()
 })
 </script>
@@ -53,8 +98,16 @@ onMounted(() => {
 
     <div class="filters-row delay-4 animate-slide-up">
       <div class="filter-group">
-        <label class="label-micro">TEAM</label>
-        <OrganicDropdown v-model="selectedTeam" :options="teamOptions" @change="onFilterChange" />
+        <label class="label-micro">{{ t('people.family') || 'FAMILY' }}</label>
+        <OrganicDropdown v-model="selectedFamily" :options="familyOptions" @change="onFamilyChange" />
+      </div>
+      <div class="filter-group">
+        <label class="label-micro">{{ t('people.red') || 'RED TEAM' }}</label>
+        <OrganicDropdown v-model="selectedRedTeam" :options="redTeamOptions" @change="onRedTeamChange" />
+      </div>
+      <div class="filter-group">
+        <label class="label-micro">{{ t('people.blue') || 'BLUE TEAM' }}</label>
+        <OrganicDropdown v-model="selectedBlueTeam" :options="blueTeamOptions" @change="onBlueTeamChange" />
       </div>
     </div>
 
@@ -95,6 +148,9 @@ onMounted(() => {
             <span v-if="member.isCaptain" class="captain-badge" title="队长">👑</span>
           </h3>
           <div class="member-tags">
+            <span v-if="member.familyId && familyById[member.familyId]" class="tag family">
+              {{ familyById[member.familyId] }}
+            </span>
             <span v-if="member.team" class="tag" :class="member.team.toLowerCase()">
               {{ member.team === 'RED' ? t('people.red') : t('people.blue') }}
             </span>
@@ -240,6 +296,12 @@ onMounted(() => {
 
 .tag.blue {
   color: #2b5c8a;
+}
+
+.tag.family {
+  color: var(--text-h);
+  background: var(--surface-hover);
+  padding: 0.15rem 0.5rem;
 }
 
 /* Empty State */

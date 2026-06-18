@@ -6,6 +6,7 @@ export interface Work {
   title: string
   authorMemberId: string | null
   authorMember?: { displayName: string } | null
+  authorName: string | null
   year: number | null
   date: string | null
   createdAt: string
@@ -18,7 +19,7 @@ export const worksService = {
     return apiClient.get<Work[]>('/works', { params })
   },
   
-  createWork(data: { type: 'ARTICLE' | 'POEM'; title: string; content: string; authorId?: string; year?: number; date?: string }) {
+  createWork(data: { type: 'ARTICLE' | 'POEM'; title: string; content: string; authorId?: string; authorName?: string; year?: number; date?: string }) {
     return apiClient.post<Work>('/works', data)
   },
   
@@ -26,6 +27,18 @@ export const worksService = {
     return apiClient.get<Work>(`/works/${id}`)
   },
   
+  updateWork(id: string, data: {
+    type?: 'ARTICLE' | 'POEM'
+    title?: string
+    content?: string
+    authorId?: string
+    authorName?: string
+    year?: number
+    date?: string
+  }) {
+    return apiClient.put<Work>(`/works/${id}`, data)
+  },
+
   deleteWork(id: string) {
     return apiClient.delete(`/works/${id}`)
   }

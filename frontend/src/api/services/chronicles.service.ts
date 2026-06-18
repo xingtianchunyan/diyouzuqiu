@@ -25,9 +25,13 @@ export const chroniclesService = {
       mediaAssets: any[]
       works: any[]
       matches: any[]
-    }>('/chronicles/daily-materials', { params: { date } })
+    }>('/daily-materials', { params: { date } })
   },
   
+  updateChronicle(id: string, data: Partial<ChronicleEventPayload>) {
+    return apiClient.put(`/chronicles/${id}`, data)
+  },
+
   deleteChronicle(id: string) {
     return apiClient.delete(`/chronicles/${id}`)
   }

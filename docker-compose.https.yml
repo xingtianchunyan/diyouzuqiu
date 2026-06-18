@@ -1,0 +1,10 @@
+# Override for public-domain HTTPS (Let's Encrypt).
+# Usage:
+#   SITE_ADDRESS=nas.yourdomain.com docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+services:
+  diyou-web:
+    command: caddy run --config /etc/caddy/Caddyfile.public --adapter caddyfile
+    volumes:
+      - ./web/Caddyfile.public:/etc/caddy/Caddyfile.public:ro
+      - caddy-data:/data
+      - caddy-config:/config

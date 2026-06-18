@@ -74,6 +74,7 @@ const formatGroupLabel = (label: string) => {
           <div class="work-details">
             <h3 class="work-title">{{ work.title }}</h3>
             <p class="work-author" v-if="work.authorMember">AUTHOR: {{ work.authorMember.displayName }}</p>
+            <p class="work-author" v-else-if="work.authorName">AUTHOR: {{ work.authorName }}</p>
             <p class="work-author" v-else-if="work.authorMemberId">AUTHOR ID: {{ work.authorMemberId }}</p>
           </div>
           <div class="work-actions" v-if="props.canDelete && props.canDelete(work)">

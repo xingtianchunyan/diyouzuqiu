@@ -8,6 +8,8 @@ import MediaGallery from '@/components/media/MediaGallery.vue'
 import MediaLightbox from '@/components/media/MediaLightbox.vue'
 import WorksGridModule from '@/components/works/WorksGridModule.vue'
 import MatchesList from '@/components/matches/MatchesList.vue'
+import { mediaService } from '../../api/services/media.service'
+import MarkdownRenderer from '../editor/MarkdownRenderer.vue'
 
 export interface ChronicleEvent {
   id: string
@@ -31,9 +33,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-work', workId: string): void
   (e: 'delete', chronicle: ChronicleEvent): void
+  (e: 'edit', chronicle: ChronicleEvent): void
 }>()
 
 const selectedMedia = ref<Media | null>(null)
+const getMediaUrl = (id: string) => mediaService.getMediaFileUrl(id)
 
 const sortedChronicles = computed(() => {
   return [...props.chronicles].sort(
@@ -126,32 +130,40 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
         <div class="timeline-content">
           <div class="chronicle-header">
             <h3 class="chronicle-title">{{ chronicle.title }}</h3>
-            <button 
-              v-if="props.canDelete && props.canDelete(chronicle)" 
-              class="delete-btn"
-              @click="emit('delete', chronicle)"
-              title="Delete"
-            >×</button>
+            <div v-if="props.canDelete && props.canDelete(chronicle)" class="chronicle-actions">
+              <button 
+                class="edit-btn"
+                @click="emit('edit', chronicle)"
+                title="Edit"
+              >✎</button>
+              <button 
+                class="delete-btn"
+                @click="emit('delete', chronicle)"
+                title="Delete"
+              >×</button>
+            </div>
           </div>
           
           <div v-if="chronicle.primaryMedia" class="chronicle-media">
             <img 
               v-if="chronicle.primaryMedia.type === 'PHOTO'" 
-              :src="`/api/v1/media/${chronicle.primaryMedia.id}/file`" 
+              :src="getMediaUrl(chronicle.primaryMedia.id)" 
               alt="Chronicle Cover" 
               class="media-img"
               loading="lazy"
             />
             <video 
               v-else-if="chronicle.primaryMedia.type === 'VIDEO'" 
-              :src="`/api/v1/media/${chronicle.primaryMedia.id}/file`" 
+              :src="getMediaUrl(chronicle.primaryMedia.id)" 
               class="media-video" 
               controls 
               preload="metadata"
             ></video>
           </div>
           
-          <p v-if="chronicle.description" class="chronicle-desc">{{ chronicle.description }}</p>
+          <div v-if="chronicle.description" class="chronicle-desc">
+            <MarkdownRenderer :markdown="chronicle.description" />
+          </div>
           
           <div v-if="chronicle.members && chronicle.members.length > 0" class="chronicle-members">
             <span class="member-tag" v-for="member in chronicle.members" :key="member.id">
@@ -312,26 +324,36 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
   margin: 0;
 }
 
+.chronicle-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 1rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.timeline-item:hover .chronicle-actions {
+  opacity: 1;
+}
+
+.edit-btn,
 .delete-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   line-height: 1;
-  padding: 0 8px;
+  padding: 0 4px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s, color 0.2s;
-  margin-left: 1rem;
+  transition: color 0.2s;
 }
 
-.timeline-item:hover .delete-btn {
-  opacity: 0.6;
+.edit-btn:hover {
+  color: var(--text-h);
 }
 
 .delete-btn:hover {
   color: var(--error, #d32f2f);
-  opacity: 1 !important;
 }
 
 .chronicle-media {
@@ -349,12 +371,10 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
 }
 
 .chronicle-desc {
-  font-family: var(--sans);
   font-size: 1rem;
   line-height: 1.6;
   color: var(--text);
   margin: 0;
-  white-space: pre-wrap;
 }
 
 .chronicle-members {

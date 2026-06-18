@@ -32,11 +32,10 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
     // Query matches
     const matches = await prisma.match.findMany({
       where: { playedAt: { gte: startOfDay, lte: endOfDay } },
-      select: { 
-        id: true, 
-        title: true, 
-        playedAt: true, 
-        redScore: true, 
+      select: {
+        id: true,
+        playedAt: true,
+        redScore: true,
         blueScore: true,
         mvpMemberId: true,
         mvpMember: {
@@ -110,6 +109,7 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
         happenedAt: true,
         title: true,
         description: true,
+        createdByUserId: true,
         primaryMedia: {
           select: {
             id: true,
@@ -169,6 +169,86 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
     })
 
     return chronicles
+  })
+
+  // PUT /chronicles/:id
+  app.put('/chronicles/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const user = request.user as { id: string; role: string; memberId?: string }
+
+    const chronicle = await prisma.chronicleEvent.findUnique({
+      where: { id },
+      include: { members: true }
+    })
+    if (!chronicle) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Chronicle event not found' } })
+    }
+
+    const isAdmin = user.role === 'ADMIN'
+    const isUploader = chronicle.createdByUserId === user.id
+    const isExclusivelyTagged = chronicle.members.length === 1 && chronicle.members[0].id === user.memberId
+
+    if (!isAdmin && !isUploader && !isExclusivelyTagged) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'Insufficient permissions to update chronicle event' } })
+    }
+
+    const body = request.body as {
+      title?: string
+      description?: string
+      happenedAt?: string
+      mediaId?: string
+      memberIds?: string[]
+      mediaAssetIds?: string[]
+      workIds?: string[]
+      matchIds?: string[]
+    }
+
+    const data: any = {}
+    if (body.title !== undefined) data.title = body.title
+    if (body.description !== undefined) data.description = body.description || null
+    if (body.happenedAt !== undefined) {
+      data.happenedAt = new Date(body.happenedAt)
+      data.year = new Date(body.happenedAt).getFullYear()
+    }
+    if (body.mediaId !== undefined) data.mediaId = body.mediaId || null
+
+    if (body.memberIds) {
+      data.members = {
+        set: body.memberIds.map(id => ({ id }))
+      }
+    }
+    if (body.mediaAssetIds) {
+      data.mediaAssets = {
+        set: body.mediaAssetIds.map(id => ({ id }))
+      }
+    }
+    if (body.workIds) {
+      data.works = {
+        set: body.workIds.map(id => ({ id }))
+      }
+    }
+    if (body.matchIds) {
+      data.matches = {
+        set: body.matchIds.map(id => ({ id }))
+      }
+    }
+
+    try {
+      const updated = await prisma.chronicleEvent.update({
+        where: { id },
+        data,
+        include: {
+          primaryMedia: { select: { id: true, type: true, takenAt: true, year: true } },
+          members: { select: { id: true, displayName: true, avatarUrl: true, team: true } },
+          mediaAssets: { select: { id: true, type: true, takenAt: true, year: true } },
+          works: { select: { id: true, type: true, title: true, authorMemberId: true, year: true, date: true, createdAt: true } },
+          matches: { select: { id: true, playedAt: true, redScore: true, blueScore: true, mvpMemberId: true } }
+        }
+      })
+      return updated
+    } catch (err: any) {
+      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update chronicle event' } })
+    }
   })
 
   // DELETE /chronicles/:id

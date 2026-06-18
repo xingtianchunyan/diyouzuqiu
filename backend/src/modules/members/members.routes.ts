@@ -1,15 +1,36 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import { saveAvatarFile } from '../../lib/storage.js'
+import { validateBody, validateQuery, z } from '../../lib/validate.js'
+
+const memberQuerySchema = z.object({
+  team: z.enum(['RED', 'BLUE']).optional(),
+  familyId: z.string().optional()
+})
+
+const createMemberSchema = z.object({
+  displayName: z.string().min(1).max(100),
+  team: z.enum(['RED', 'BLUE']).optional(),
+  familyId: z.string().optional()
+})
+
+const updateMemberSchema = z.object({
+  displayName: z.string().min(1).max(100).optional(),
+  team: z.enum(['RED', 'BLUE']).optional().nullable(),
+  familyId: z.string().optional().nullable(),
+  isCaptain: z.boolean().optional(),
+  avatarUrl: z.string().optional().nullable()
+})
 
 export const membersRoutes: FastifyPluginAsync = async (app) => {
   // GET /members
-  app.get('/members', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { team } = request.query as { team?: 'RED' | 'BLUE' }
+  app.get('/members', { preValidation: [app.authenticate, validateQuery(memberQuerySchema)] }, async (request, reply) => {
+    const { team, familyId } = (request as any).validatedQuery as { team?: 'RED' | 'BLUE'; familyId?: string }
     
     const members = await prisma.member.findMany({
       where: {
-        ...(team && { team })
+        ...(team && { team }),
+        ...(familyId && { familyId })
       },
       select: {
         id: true,
@@ -26,21 +47,19 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /members (ADMIN)
-  app.post('/members', { preValidation: [app.requireAdmin] }, async (request, reply) => {
-    const { displayName, team } = request.body as { 
-      displayName?: string
+  app.post('/members', { preValidation: [app.requireAdmin, validateBody(createMemberSchema)] }, async (request, reply) => {
+    const { displayName, team, familyId } = (request as any).validatedBody as {
+      displayName: string
       team?: 'RED' | 'BLUE'
+      familyId?: string
     }
-    
-    if (!displayName) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'displayName is required' } })
-    }
-    
+
     try {
       const member = await prisma.member.create({
         data: {
           displayName,
-          team
+          team,
+          familyId: familyId || null
         }
       })
       return reply.code(201).send(member)
@@ -85,9 +104,9 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // PUT /members/:id
-  app.put('/members/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
+  app.put('/members/:id', { preValidation: [app.authenticate, validateBody(updateMemberSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { displayName, team, isCaptain, avatarUrl } = request.body as any
+    const { displayName, team, familyId, isCaptain, avatarUrl } = (request as any).validatedBody
     const user = request.user
 
     const data: any = {}
@@ -95,6 +114,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
     if (user.role === 'ADMIN') {
       if (displayName !== undefined) data.displayName = displayName
       if (team !== undefined) data.team = team || null
+      if (familyId !== undefined) data.familyId = familyId || null
       if (isCaptain !== undefined) data.isCaptain = isCaptain
       if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null
     } else {

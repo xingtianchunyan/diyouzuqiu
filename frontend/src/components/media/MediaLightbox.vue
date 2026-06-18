@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import type { Media } from '../../api/services/media.service'
 import { mediaService } from '../../api/services/media.service'
 
@@ -50,6 +51,15 @@ const getMediaUrl = (id: string) => mediaService.getMediaFileUrl(id)
           @dblclick="emit('close')"
         ></video>
         <div class="lightbox-hint">✌️ 双指缩放，双击关闭</div>
+        <RouterLink
+          v-if="media"
+          :to="`/media/${media.id}`"
+          class="lightbox-link"
+          title="打开独立页面"
+          @click.stop
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </RouterLink>
         <div class="lightbox-info" v-if="media">
           <p v-if="media.takenAt">{{ t('upload.media') }} Time: {{ new Date(media.takenAt).toLocaleString() }}</p>
           <p v-if="media.personTags && media.personTags.length > 0">
@@ -129,6 +139,25 @@ const getMediaUrl = (id: string) => mediaService.getMediaFileUrl(id)
   -webkit-backdrop-filter: blur(4px);
   animation: fadeOut 3s forwards;
   animation-delay: 2s;
+}
+
+.lightbox-link {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.lightbox-link:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 @keyframes fadeOut {

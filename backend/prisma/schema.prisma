@@ -102,6 +102,7 @@ model Work {
   content         String
   authorMemberId  String?
   authorMember    Member?   @relation(fields: [authorMemberId], references: [id], onDelete: SetNull)
+  authorName      String?
   year            Int?
   date            DateTime?
   createdByUserId String?

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { membersService, type MemberDetail } from '../api/services/members.service'
 import { mediaService, type Media } from '../api/services/media.service'
@@ -8,6 +8,7 @@ import { worksService, type Work } from '../api/services/works.service'
 import { matchesService, type Match } from '../api/services/matches.service'
 import { chroniclesService } from '../api/services/chronicles.service'
 import { useAuthStore } from '../stores/auth'
+import { useFamiliesStore } from '../stores/families'
 import EmptyState from '../components/base/EmptyState.vue'
 import WorksGridModule from '@/components/works/WorksGridModule.vue'
 import WorksCollectionModule, { type WorksTypeFilter } from '@/components/works/WorksCollectionModule.vue'
@@ -15,7 +16,12 @@ import WorkReader from '@/components/works/WorkReader.vue'
 import MatchesList from '@/components/matches/MatchesList.vue'
 import ChroniclesList from '@/components/chronicles/ChroniclesList.vue'
 import PersonTabs from '@/components/people/PersonTabs.vue'
+import WorkEditModal from '@/components/works/WorkEditModal.vue'
+import MatchEditModal from '@/components/matches/MatchEditModal.vue'
+import ChronicleEditModal from '@/components/chronicles/ChronicleEditModal.vue'
 import MonthGroupHeading from '@/components/base/MonthGroupHeading.vue'
+import MediaEditModal from '@/components/media/MediaEditModal.vue'
+import MemberEditModal from '@/components/members/MemberEditModal.vue'
 
 const props = defineProps<{
   id: string | number
@@ -25,6 +31,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
+const familiesStore = useFamiliesStore()
 
 const id = computed(() => String(route.params.id ?? ''))
 const person = ref<MemberDetail | null>(null)
@@ -52,8 +59,56 @@ const matchesList = ref<Match[]>([])
 const chroniclesList = ref<any[]>([])
 
 const selectedMedia = ref<Media | null>(null)
+const editingMedia = ref<Media | null>(null)
 const selectedWork = ref<Work | null>(null)
+const editingWork = ref<Work | null>(null)
+const editingMatch = ref<Match | null>(null)
+const editingChronicle = ref<any>(null)
+const editingMember = ref<MemberDetail | null>(null)
 const readerLoading = ref(false)
+
+const handleUpdatedMedia = (updated: Media) => {
+  const index = mediaList.value.findIndex(m => m.id === updated.id)
+  if (index !== -1) {
+    mediaList.value[index] = { ...mediaList.value[index], ...updated }
+  }
+  if (selectedMedia.value?.id === updated.id) {
+    selectedMedia.value = { ...selectedMedia.value, ...updated }
+  }
+}
+
+const handleUpdatedWork = (updated: Work) => {
+  const index = worksList.value.findIndex(w => w.id === updated.id)
+  if (index !== -1) {
+    worksList.value[index] = { ...worksList.value[index], ...updated }
+  }
+  if (selectedWork.value?.id === updated.id) {
+    selectedWork.value = { ...selectedWork.value, ...updated }
+  }
+}
+
+const handleUpdatedMatch = (updated: Match) => {
+  const index = matchesList.value.findIndex(m => m.id === updated.id)
+  if (index !== -1) {
+    matchesList.value[index] = { ...matchesList.value[index], ...updated }
+  }
+}
+
+const handleUpdatedChronicle = (updated: any) => {
+  const index = chroniclesList.value.findIndex(c => c.id === updated.id)
+  if (index !== -1) {
+    chroniclesList.value[index] = { ...chroniclesList.value[index], ...updated }
+  }
+}
+
+const handleUpdatedMember = (updated: MemberDetail) => {
+  if (person.value) {
+    person.value.displayName = updated.displayName
+    person.value.team = updated.team
+    person.value.familyId = updated.familyId
+    person.value.isCaptain = updated.isCaptain
+  }
+}
 
 const canEdit = computed(() => {
   if (!authStore.user) return false
@@ -216,7 +271,7 @@ const openWorkReader = async (workId: string) => {
     const res = await worksService.getWorkDetail(workId)
     selectedWork.value = res.data
   } catch (e) {
-    console.error('Failed to load work detail', e)
+    // Silent: reader will show empty state
   } finally {
     readerLoading.value = false
   }
@@ -231,6 +286,7 @@ const goBack = () => {
 }
 
 onMounted(async () => {
+  familiesStore.fetchFamilies()
   loadPerson()
   window.addEventListener('keydown', handleKeydown)
 })
@@ -283,10 +339,16 @@ onUnmounted(() => {
               <span v-if="person.isCaptain" class="captain-badge" title="队长">👑</span>
             </h2>
             <div class="tags">
+              <span v-if="person.familyId" class="tag family">
+                {{ familiesStore.familyById[person.familyId] || 'Family' }}
+              </span>
               <span v-if="person.team" class="tag" :class="person.team.toLowerCase()">
                 {{ person.team === 'RED' ? t('people.red') : t('people.blue') }}
               </span>
             </div>
+            <button v-if="canEdit" class="edit-profile-btn" @click="editingMember = person">
+              编辑资料
+            </button>
           </div>
         </div>
 
@@ -305,6 +367,7 @@ onUnmounted(() => {
               :chronicles="chroniclesList" 
               :can-delete="canDeleteChronicle"
               @delete="handleDeleteChronicle"
+              @edit="editingChronicle = $event"
               @select-work="openWorkReader" 
             />
           </div>
@@ -319,17 +382,25 @@ onUnmounted(() => {
                 <MonthGroupHeading :label="group.label" />
                 <div class="media-gallery">
                   <div v-for="item in group.items" :key="item.id" class="media-frame" @click="selectedMedia = item">
-                    <img :src="`/api/v1/media/${item.id}/file`" alt="Media" class="media-img" v-if="item.type === 'PHOTO'" loading="lazy" />
-                    <video :src="`/api/v1/media/${item.id}/file`" class="media-video" v-else-if="item.type === 'VIDEO'" controls preload="metadata"></video>
+                    <img :src="mediaService.getMediaFileUrl(item.id)" alt="Media" class="media-img" v-if="item.type === 'PHOTO'" loading="lazy" />
+                    <video :src="mediaService.getMediaFileUrl(item.id)" class="media-video" v-else-if="item.type === 'VIDEO'" controls preload="metadata"></video>
 
-                    <button
-                      v-if="canDeleteMedia(item)"
-                      class="delete-media-btn"
-                      @click.stop="handleDeleteMedia(item.id)"
-                      title="Delete"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
+                    <div v-if="canDeleteMedia(item)" class="media-actions">
+                      <button
+                        class="edit-media-btn"
+                        @click.stop="editingMedia = item"
+                        title="Edit"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      </button>
+                      <button
+                        class="delete-media-btn"
+                        @click.stop="handleDeleteMedia(item.id)"
+                        title="Delete"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -349,6 +420,7 @@ onUnmounted(() => {
               group-by="month" 
               :can-delete="canDeleteWork"
               @delete="handleDeleteWork"
+              @edit="editingWork = $event"
               @select="openWorkReader" 
             />
           </div>
@@ -361,6 +433,7 @@ onUnmounted(() => {
               :highlightMvpId="id" 
               :can-delete="canDeleteMatch"
               @delete="handleDeleteMatch"
+              @edit="editingMatch = $event"
             />
           </div>
         </div>
@@ -375,25 +448,64 @@ onUnmounted(() => {
     />
   </main>
 
+  <MediaEditModal
+    :media="editingMedia"
+    @close="editingMedia = null"
+    @updated="handleUpdatedMedia"
+  />
+
+  <WorkEditModal
+    :work="editingWork"
+    @close="editingWork = null"
+    @updated="handleUpdatedWork"
+  />
+
+  <MatchEditModal
+    :match="editingMatch"
+    @close="editingMatch = null"
+    @updated="handleUpdatedMatch"
+  />
+
+  <ChronicleEditModal
+    :chronicle="editingChronicle"
+    @close="editingChronicle = null"
+    @updated="handleUpdatedChronicle"
+  />
+
+  <MemberEditModal
+    :member="editingMember"
+    @close="editingMember = null"
+    @updated="handleUpdatedMember"
+  />
+
   <!-- Lightbox -->
   <Transition name="fade">
     <div v-if="selectedMedia" class="lightbox" @click="selectedMedia = null">
       <div class="lightbox-content" @click.stop>
         <img
           v-if="selectedMedia.type === 'PHOTO'"
-          :src="`/api/v1/media/${selectedMedia.id}/file`"
+          :src="mediaService.getMediaFileUrl(selectedMedia.id)"
           class="lightbox-media"
           @dblclick="selectedMedia = null"
         />
         <video
           v-else-if="selectedMedia.type === 'VIDEO'"
-          :src="`/api/v1/media/${selectedMedia.id}/file`"
+          :src="mediaService.getMediaFileUrl(selectedMedia.id)"
           class="lightbox-media"
           controls
           autoplay
           @dblclick="selectedMedia = null"
         ></video>
         <div class="lightbox-hint">✌️ 双指缩放，双击关闭</div>
+        <RouterLink
+          v-if="selectedMedia"
+          :to="`/media/${selectedMedia.id}`"
+          class="lightbox-link"
+          title="打开独立页面"
+          @click.stop
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </RouterLink>
         <div class="lightbox-info" v-if="selectedMedia">
           <p v-if="selectedMedia.takenAt">{{ t('upload.media') }} Time: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
           <p v-if="selectedMedia.personTags && selectedMedia.personTags.length > 0">
@@ -542,6 +654,25 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
+.edit-profile-btn {
+  margin-top: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  padding: 0.4rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.edit-profile-btn:hover {
+  border-color: var(--text-h);
+  color: var(--text-h);
+}
+
 .archive-section {
   margin-top: 2rem;
 }
@@ -578,11 +709,24 @@ onUnmounted(() => {
   transform: scale(1.03);
 }
 
-.delete-media-btn {
+.media-actions {
   position: absolute;
   top: 4px;
   right: 4px;
-  background: rgba(229, 57, 53, 0.9);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.media-frame:hover .media-actions {
+  opacity: 1;
+}
+
+.edit-media-btn,
+.delete-media-btn {
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   border: none;
   border-radius: 4px;
@@ -592,15 +736,17 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 10;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
-.delete-media-btn:hover {
+
+.edit-media-btn:hover {
+  background: rgba(56, 142, 60, 0.9);
   transform: scale(1.1);
 }
-.media-frame:hover .delete-media-btn {
-  opacity: 1;
+
+.delete-media-btn:hover {
+  background: rgba(229, 57, 53, 0.9);
+  transform: scale(1.1);
 }
 
 /* Lightbox styles */
@@ -676,6 +822,25 @@ onUnmounted(() => {
     opacity: 0;
     visibility: hidden;
   }
+}
+
+.lightbox-link {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.lightbox-link:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .fade-enter-active,

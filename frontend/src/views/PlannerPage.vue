@@ -27,7 +27,7 @@ onMounted(() => {
     try {
       messages.value = JSON.parse(cached)
     } catch (e) {
-      console.error('Failed to parse cached chat history', e)
+      // Invalid cache: ignore and use default messages
     }
   }
 })
@@ -44,13 +44,32 @@ const clearHistory = () => {
   }
 }
 
-const tabs = [
+const resultTabs = [
   { id: 'plan', label: '策划案' },
   { id: 'budget', label: '预算表' },
   { id: 'prizes', label: '奖品清单' },
   { id: 'speech', label: '主持词' }
 ]
 const activeResultTab = ref('plan')
+
+const modeTabs = [
+  { id: 'chat', label: '自由对话' },
+  { id: 'form', label: '结构化表单' }
+]
+const activeMode = ref<'chat' | 'form'>('chat')
+
+const plannerForm = ref({
+  peopleCount: '',
+  budget: '',
+  date: '',
+  location: '',
+  durationHours: '',
+  style: '',
+  mustHave: '',
+  avoid: '',
+  notes: ''
+})
+const formLoading = ref(false)
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -138,6 +157,44 @@ const sendMessage = async () => {
   }
 }
 
+const submitPlannerForm = async () => {
+  const peopleCount = Number(plannerForm.value.peopleCount)
+  const budget = Number(plannerForm.value.budget)
+  if (!peopleCount || !budget || !plannerForm.value.date || !plannerForm.value.location) {
+    alert('请填写参与人数、预算、日期和地点')
+    return
+  }
+
+  formLoading.value = true
+  try {
+    const constraints = {
+      peopleCount,
+      budget,
+      date: plannerForm.value.date,
+      location: plannerForm.value.location,
+      ...(plannerForm.value.durationHours ? { durationHours: Number(plannerForm.value.durationHours) } : {}),
+      ...(plannerForm.value.style ? { style: plannerForm.value.style } : {}),
+      ...(plannerForm.value.mustHave ? { mustHave: plannerForm.value.mustHave.split(/[\n,，]/).map(s => s.trim()).filter(Boolean) } : {}),
+      ...(plannerForm.value.avoid ? { avoid: plannerForm.value.avoid.split(/[\n,，]/).map(s => s.trim()).filter(Boolean) } : {}),
+      ...(plannerForm.value.notes ? { notes: plannerForm.value.notes } : {})
+    }
+
+    const res = await knowledgeService.generateAnnualPlan(constraints)
+    const plan = res.data.plan
+    messages.value.push({
+      role: 'assistant',
+      content: JSON.stringify(plan),
+      parsedPlan: plan
+    })
+    activeMode.value = 'chat'
+    scrollToBottom()
+  } catch (err: any) {
+    alert(`生成方案失败: ${err.response?.data?.error?.message || err.message}`)
+  } finally {
+    formLoading.value = false
+  }
+}
+
 const handleFileUpload = async (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -192,9 +249,21 @@ const handleFileUpload = async (e: Event) => {
 
     <div class="divider-y delay-4 animate-slide-up"></div>
 
+    <div class="mode-tabs delay-4 animate-slide-up">
+      <button
+        v-for="tab in modeTabs"
+        :key="tab.id"
+        class="mode-tab"
+        :class="{ active: activeMode === tab.id }"
+        @click="activeMode = tab.id as 'chat' | 'form'"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
     <div class="chat-container delay-4 animate-slide-up">
       <!-- Chat Messages -->
-      <div class="chat-messages" ref="messagesContainer">
+      <div v-if="activeMode === 'chat'" class="chat-messages" ref="messagesContainer">
         <div 
           v-for="(msg, index) in messages" 
           :key="index" 
@@ -221,7 +290,7 @@ const handleFileUpload = async (e: Event) => {
             <div v-if="msg.parsedPlan" class="plan-result">
               <div class="tabs-nav">
                 <button 
-                  v-for="tab in tabs" 
+                  v-for="tab in resultTabs" 
                   :key="tab.id"
                   class="tab-btn" 
                   :class="{ active: activeResultTab === tab.id }"
@@ -249,7 +318,7 @@ const handleFileUpload = async (e: Event) => {
       </div>
 
       <!-- Chat Input -->
-      <div class="chat-input-area">
+      <div v-if="activeMode === 'chat'" class="chat-input-area">
         <form @submit.prevent="sendMessage" class="chat-form">
           <label class="upload-btn" :class="{ disabled: fileLoading }" title="上传参考文档至知识库">
             <input type="file" @change="handleFileUpload" accept=".txt,.pdf,.docx,.doc" :disabled="fileLoading" hidden />
@@ -265,6 +334,63 @@ const handleFileUpload = async (e: Event) => {
           />
           <button type="submit" class="send-btn" :disabled="!inputMessage.trim() || loading">
             SEND
+          </button>
+        </form>
+      </div>
+
+      <!-- Structured Form -->
+      <div v-else class="planner-form-area">
+        <form @submit.prevent="submitPlannerForm" class="planner-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">参与人数 *</label>
+              <input v-model.number="plannerForm.peopleCount" type="number" class="form-input" required min="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">总预算（元） *</label>
+              <input v-model.number="plannerForm.budget" type="number" class="form-input" required min="0" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">日期 *</label>
+              <input v-model="plannerForm.date" type="date" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">时长（小时）</label>
+              <input v-model.number="plannerForm.durationHours" type="number" class="form-input" min="0" step="0.5" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">地点/场地 *</label>
+            <input v-model="plannerForm.location" type="text" class="form-input" required placeholder="例如：室内球场 / 酒店宴会厅" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">风格</label>
+            <input v-model="plannerForm.style" type="text" class="form-input" placeholder="例如：温馨 / 热烈 / 正式 / 轻松" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">必须包含的环节</label>
+            <textarea v-model="plannerForm.mustHave" class="form-textarea" rows="3" placeholder="用逗号或换行分隔，例如：颁奖，抽奖，合影"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">禁忌与避免事项</label>
+            <textarea v-model="plannerForm.avoid" class="form-textarea" rows="3" placeholder="用逗号或换行分隔"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">其他补充</label>
+            <textarea v-model="plannerForm.notes" class="form-textarea" rows="3"></textarea>
+          </div>
+
+          <button type="submit" class="send-btn" :disabled="formLoading">
+            <span v-if="formLoading">生成中...</span>
+            <span v-else>生成年会方案</span>
           </button>
         </form>
       </div>
@@ -551,5 +677,103 @@ const handleFileUpload = async (e: Event) => {
 :deep(.markdown-body strong) {
   font-weight: 600;
   color: var(--text-h);
+}
+
+/* Mode Tabs */
+.mode-tabs {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mode-tab {
+  background: none;
+  border: none;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.75rem 0;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text-h);
+}
+
+.mode-tab.active {
+  color: var(--text-h);
+  border-bottom: 2px solid var(--text-h);
+  margin-bottom: -1px;
+}
+
+/* Planner Form */
+.planner-form-area {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+}
+
+.planner-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.planner-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.planner-form .form-label {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.planner-form .form-input,
+.planner-form .form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  color: var(--text-h);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.planner-form .form-input:focus,
+.planner-form .form-textarea:focus {
+  border-color: var(--text-h);
+}
+
+.planner-form .form-textarea {
+  resize: vertical;
+  line-height: 1.5;
 }
 </style>

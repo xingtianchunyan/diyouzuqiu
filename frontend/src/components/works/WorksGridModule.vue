@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'select', workId: string): void
   (e: 'delete', work: Work): void
+  (e: 'edit', work: Work): void
 }>()
 
 const { t } = useI18n()
@@ -87,18 +88,27 @@ const getTypeLabel = (work: Work) => {
           <div class="work-card-meta">
             <span class="work-type">{{ getTypeLabel(work) }}</span>
             <span v-if="getMetaDate(work)" class="work-date">{{ getMetaDate(work) }}</span>
-            <button 
-              v-if="props.canDelete && props.canDelete(work)" 
-              class="delete-btn"
-              @click.stop="emit('delete', work)"
-              title="Delete"
-            >
-              ×
-            </button>
+            <div v-if="props.canDelete && props.canDelete(work)" class="work-actions">
+              <button 
+                class="edit-btn"
+                @click.stop="emit('edit', work)"
+                title="Edit"
+              >
+                ✎
+              </button>
+              <button 
+                class="delete-btn"
+                @click.stop="emit('delete', work)"
+                title="Delete"
+              >
+                ×
+              </button>
+            </div>
           </div>
           <h3 class="work-title">{{ work.title }}</h3>
           <div v-if="props.showAuthor" class="work-author">
             <span v-if="work.authorMember">{{ work.authorMember.displayName }}</span>
+            <span v-else-if="work.authorName">{{ work.authorName }}</span>
             <span v-else-if="work.authorMemberId">{{ work.authorMemberId }}</span>
           </div>
         </button>
@@ -179,26 +189,36 @@ const getTypeLabel = (work: Work) => {
   letter-spacing: 0.05em;
 }
 
+.work-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.work-card:hover .work-actions {
+  opacity: 1;
+}
+
+.edit-btn,
 .delete-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
   padding: 0 4px;
   cursor: pointer;
-  margin-left: auto;
-  opacity: 0;
-  transition: opacity 0.2s, color 0.2s;
+  transition: color 0.2s;
 }
 
-.work-card:hover .delete-btn {
-  opacity: 0.6;
+.edit-btn:hover {
+  color: var(--text-h);
 }
 
 .delete-btn:hover {
   color: var(--error, #d32f2f);
-  opacity: 1 !important;
 }
 
 .work-title {

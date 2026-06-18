@@ -5,6 +5,8 @@
       <p class="panel-desc">勾选下方卡片即可自动关联到本次大事记，无需再次上传。</p>
     </div>
 
+    <div v-if="panelError" class="panel-error">{{ panelError }}</div>
+
     <div class="materials-grid">
       <!-- Media Assets -->
       <label class="material-card media-card" v-for="media in data.mediaAssets" :key="media.id">
@@ -23,8 +25,8 @@
           class="card-checkbox" 
         />
         <div class="card-content">
-          <img v-if="media.type === 'PHOTO'" :src="`/api/v1/media/${media.id}/file`" class="card-img" />
-          <video v-else-if="media.type === 'VIDEO'" :src="`/api/v1/media/${media.id}/file`" class="card-img" preload="metadata"></video>
+          <img v-if="media.type === 'PHOTO'" :src="getMediaUrl(media.id)" class="card-img" />
+          <video v-else-if="media.type === 'VIDEO'" :src="getMediaUrl(media.id)" class="card-img" preload="metadata"></video>
           <div class="card-meta">
             <span class="tag">{{ media.type === 'PHOTO' ? '照片' : '视频' }}</span>
             <span class="filename" :title="media.originalFilename">{{ media.originalFilename || '未命名' }}</span>
@@ -74,6 +76,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { chroniclesService } from '../api/services/chronicles.service'
+import { mediaService } from '../api/services/media.service'
 
 const props = defineProps<{
   date: string
@@ -96,6 +99,7 @@ const data = ref<{
 }>({ mediaAssets: [], works: [], matches: [] })
 
 const loading = ref(false)
+const panelError = ref<string | null>(null)
 
 const selectedPhotos = ref<string[]>([])
 const selectedVideos = ref<string[]>([])
@@ -106,6 +110,8 @@ const selectedMatches = ref<string[]>([])
 const hasMaterials = computed(() => {
   return data.value.mediaAssets.length > 0 || data.value.works.length > 0 || data.value.matches.length > 0
 })
+
+const getMediaUrl = (id: string) => mediaService.getMediaFileUrl(id)
 
 let timeout: any // debounce timer
 watch(() => props.date, (newDate) => {
@@ -127,8 +133,8 @@ watch(() => props.date, (newDate) => {
       selectedArticles.value = selectedArticles.value.filter(id => res.data.works.some(w => w.id === id && w.type === 'ARTICLE'))
       selectedPoems.value = selectedPoems.value.filter(id => res.data.works.some(w => w.id === id && w.type === 'POEM'))
       selectedMatches.value = selectedMatches.value.filter(id => res.data.matches.some(m => m.id === id))
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      panelError.value = err.response?.data?.error?.message || err.message || 'Failed to load daily materials'
     } finally {
       loading.value = false
     }
@@ -156,6 +162,12 @@ watch([selectedPhotos, selectedVideos, selectedArticles, selectedPoems, selected
   margin: 0 0 0.25rem 0;
   color: var(--text-h);
   font-weight: 500;
+}
+.panel-error {
+  color: var(--error);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
 }
 .panel-desc {
   margin: 0 0 1rem 0;

@@ -1,0 +1,12 @@
+{$SITE_ADDRESS:localhost} {
+    root * /srv
+    encode gzip
+
+    # Proxy API and user-uploaded static files to the backend
+    reverse_proxy /api/* {$BACKEND_URL:diyou-backend:3000}
+    reverse_proxy /static-storage/* {$BACKEND_URL:diyou-backend:3000}
+
+    # SPA fallback
+    try_files {path} /index.html
+    file_server
+}

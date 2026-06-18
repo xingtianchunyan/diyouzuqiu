@@ -8,6 +8,7 @@ import { worksService, type Work } from '../api/services/works.service'
 import WorksCollectionModule, { type WorksTypeFilter } from '@/components/works/WorksCollectionModule.vue'
 import WorksGridModule from '@/components/works/WorksGridModule.vue'
 import WorkReader from '@/components/works/WorkReader.vue'
+import WorkEditModal from '@/components/works/WorkEditModal.vue'
 import OrganicDropdown from '@/components/base/OrganicDropdown.vue'
 
 const { t } = useI18n()
@@ -20,7 +21,18 @@ const currentTab = ref<WorksTypeFilter>('ALL')
 const searchQuery = ref('')
 const filterYear = ref<number | ''>('')
 const selectedWork = ref<Work | null>(null)
+const editingWork = ref<Work | null>(null)
 const readerLoading = ref(false)
+
+const handleUpdatedWork = (updated: Work) => {
+  const index = worksStore.works.findIndex(w => w.id === updated.id)
+  if (index !== -1) {
+    worksStore.works[index] = { ...worksStore.works[index], ...updated }
+  }
+  if (selectedWork.value?.id === updated.id) {
+    selectedWork.value = { ...selectedWork.value, ...updated }
+  }
+}
 
 const currentYear = new Date().getFullYear()
 const years = Array.from({ length: Math.max(2026, currentYear) - 2015 + 1 }, (_, i) => Math.max(2026, currentYear) - i)
@@ -80,7 +92,7 @@ const openWorkReader = async (id: string) => {
     const res = await worksService.getWorkDetail(id)
     selectedWork.value = res.data
   } catch (e) {
-    console.error('Failed to load work detail', e)
+    // Silent: reader will show empty state
   } finally {
     readerLoading.value = false
   }
@@ -142,6 +154,7 @@ onMounted(() => {
         group-by="month" 
         :can-delete="canDeleteWork"
         @delete="handleDeleteWork"
+        @edit="editingWork = $event"
         @select="openWorkReader" 
       />
     </div>
@@ -152,6 +165,12 @@ onMounted(() => {
       :can-delete="canDeleteWork"
       @delete="handleDeleteWork"
       @close="closeWorkReader" 
+    />
+
+    <WorkEditModal
+      :work="editingWork"
+      @close="editingWork = null"
+      @updated="handleUpdatedWork"
     />
   </main>
 </template>

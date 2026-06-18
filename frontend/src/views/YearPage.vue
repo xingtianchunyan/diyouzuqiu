@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { yearsService, type YearAggregation } from '../api/services/years.service'
-import { mediaService } from '../api/services/media.service'
+import { mediaService, type Media } from '../api/services/media.service'
 import { worksService, type Work } from '../api/services/works.service'
 import { matchesService, type Match } from '../api/services/matches.service'
 import { chroniclesService } from '../api/services/chronicles.service'
@@ -13,6 +13,10 @@ import ChroniclesList from '@/components/chronicles/ChroniclesList.vue'
 import WorksGridModule from '@/components/works/WorksGridModule.vue'
 import WorkReader from '@/components/works/WorkReader.vue'
 import MediaGallery from '@/components/media/MediaGallery.vue'
+import MediaEditModal from '@/components/media/MediaEditModal.vue'
+import WorkEditModal from '@/components/works/WorkEditModal.vue'
+import MatchEditModal from '@/components/matches/MatchEditModal.vue'
+import ChronicleEditModal from '@/components/chronicles/ChronicleEditModal.vue'
 
 const props = defineProps<{
   year: string | number
@@ -29,8 +33,50 @@ const error = ref<string | null>(null)
 const data = ref<YearAggregation | null>(null)
 const yearListRef = ref<HTMLElement | null>(null)
 const selectedMedia = ref<any | null>(null)
+const editingMedia = ref<Media | null>(null)
 const selectedWork = ref<Work | null>(null)
+const editingWork = ref<Work | null>(null)
+const editingMatch = ref<Match | null>(null)
+const editingChronicle = ref<any>(null)
 const readerLoading = ref(false)
+
+const handleUpdatedMedia = (updated: Media) => {
+  if (!data.value) return
+  const index = data.value.media.findIndex((m: any) => m.id === updated.id)
+  if (index !== -1) {
+    data.value.media[index] = { ...data.value.media[index], ...updated }
+  }
+  if (selectedMedia.value?.id === updated.id) {
+    selectedMedia.value = { ...selectedMedia.value, ...updated }
+  }
+}
+
+const handleUpdatedWork = (updated: Work) => {
+  if (!data.value) return
+  const index = data.value.works.findIndex((w: any) => w.id === updated.id)
+  if (index !== -1) {
+    data.value.works[index] = { ...data.value.works[index], ...updated }
+  }
+  if (selectedWork.value?.id === updated.id) {
+    selectedWork.value = { ...selectedWork.value, ...updated }
+  }
+}
+
+const handleUpdatedMatch = (updated: Match) => {
+  if (!data.value) return
+  const index = data.value.matches.findIndex((m: any) => m.id === updated.id)
+  if (index !== -1) {
+    data.value.matches[index] = { ...data.value.matches[index], ...updated }
+  }
+}
+
+const handleUpdatedChronicle = (updated: any) => {
+  if (!data.value || !data.value.events) return
+  const index = data.value.events.findIndex((c: any) => c.id === updated.id)
+  if (index !== -1) {
+    data.value.events[index] = { ...data.value.events[index], ...updated }
+  }
+}
 
 const canDeleteMedia = (item: any) => {
   if (!authStore.user) return false
@@ -129,7 +175,7 @@ const openWorkReader = async (workId: string) => {
     const res = await worksService.getWorkDetail(workId)
     selectedWork.value = res.data
   } catch (e) {
-    console.error('Failed to load work detail', e)
+    // Silent: reader will show empty state
   } finally {
     readerLoading.value = false
   }
@@ -241,8 +287,7 @@ const fetchData = async () => {
     const res = await yearsService.getYearAggregation(year.value)
     data.value = res.data
   } catch (err: any) {
-    console.error('Failed to fetch year data', err)
-    error.value = err.message || 'Failed to load year data'
+    error.value = err.response?.data?.error?.message || err.message || 'Failed to load year data'
   } finally {
     loading.value = false
     // Allow DOM to update then scroll to center the active year
@@ -323,6 +368,7 @@ watch(() => route.params.year, (newYear) => {
               :chronicles="data.events" 
               :can-delete="canDeleteChronicle"
               @delete="handleDeleteChronicle"
+              @edit="editingChronicle = $event"
               @select-work="openWorkReader" 
             />
           </div>
@@ -336,6 +382,7 @@ watch(() => route.params.year, (newYear) => {
               :can-delete="canDeleteMedia" 
               @delete="handleDeleteMedia" 
               @select="selectedMedia = $event" 
+              @edit="editingMedia = $event"
             />
           </div>
 
@@ -347,6 +394,7 @@ watch(() => route.params.year, (newYear) => {
               group-by="month"
               :can-delete="canDeleteWork"
               @delete="handleDeleteWork"
+              @edit="editingWork = $event"
               @select="openWorkReader" 
             />
           </div>
@@ -359,6 +407,7 @@ watch(() => route.params.year, (newYear) => {
               groupBy="month" 
               :can-delete="canDeleteMatch"
               @delete="handleDeleteMatch"
+              @edit="editingMatch = $event"
             />
           </div>
 
@@ -378,19 +427,28 @@ watch(() => route.params.year, (newYear) => {
       <div class="lightbox-content" @click.stop>
         <img 
           v-if="selectedMedia.type === 'PHOTO'" 
-          :src="`/api/v1/media/${selectedMedia.id}/file`" 
+          :src="mediaService.getMediaFileUrl(selectedMedia.id)" 
           class="lightbox-media" 
           @dblclick="selectedMedia = null"
         />
         <video 
           v-else-if="selectedMedia.type === 'VIDEO'" 
-          :src="`/api/v1/media/${selectedMedia.id}/file`" 
+          :src="mediaService.getMediaFileUrl(selectedMedia.id)" 
           class="lightbox-media" 
           controls 
           autoplay
           @dblclick="selectedMedia = null"
         ></video>
         <div class="lightbox-hint">✌️ 双指缩放，双击关闭</div>
+        <RouterLink
+          v-if="selectedMedia"
+          :to="`/media/${selectedMedia.id}`"
+          class="lightbox-link"
+          title="打开独立页面"
+          @click.stop
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </RouterLink>
         <div class="lightbox-info" v-if="selectedMedia">
           <p v-if="selectedMedia.takenAt">{{ t('upload.media') }} Time: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
           <p v-if="selectedMedia.personTags && selectedMedia.personTags.length > 0">
@@ -407,6 +465,30 @@ watch(() => route.params.year, (newYear) => {
     :can-delete="canDeleteWork"
     @delete="handleDeleteWork"
     @close="closeWorkReader" 
+  />
+
+  <MediaEditModal
+    :media="editingMedia"
+    @close="editingMedia = null"
+    @updated="handleUpdatedMedia"
+  />
+
+  <WorkEditModal
+    :work="editingWork"
+    @close="editingWork = null"
+    @updated="handleUpdatedWork"
+  />
+
+  <MatchEditModal
+    :match="editingMatch"
+    @close="editingMatch = null"
+    @updated="handleUpdatedMatch"
+  />
+
+  <ChronicleEditModal
+    :chronicle="editingChronicle"
+    @close="editingChronicle = null"
+    @updated="handleUpdatedChronicle"
   />
 </template>
 
@@ -757,5 +839,24 @@ watch(() => route.params.year, (newYear) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.lightbox-link {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.lightbox-link:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>

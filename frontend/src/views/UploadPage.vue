@@ -7,6 +7,7 @@ import { worksService } from '../api/services/works.service'
 import { matchesService } from '../api/services/matches.service'
 import { chroniclesService } from '../api/services/chronicles.service'
 import { useMembersStore } from '../stores/members'
+import { useFamiliesStore } from '../stores/families'
 import { useMediaStore } from '../stores/media'
 import { useWorksStore } from '../stores/works'
 import { useMatchesStore } from '../stores/matches'
@@ -14,18 +15,21 @@ import OrganicDropdown from '../components/base/OrganicDropdown.vue'
 import OrganicToggle from '../components/base/OrganicToggle.vue'
 import ExifReader from 'exifreader'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import SmartImport from '../components/SmartImport.vue'
 import DailyMaterialsPanel from '../components/DailyMaterialsPanel.vue'
+import MarkdownEditor from '../components/editor/MarkdownEditor.vue'
 
 const { t } = useI18n()
 const route = useRoute()
+const authStore = useAuthStore()
 
 const membersStore = useMembersStore()
+const familiesStore = useFamiliesStore()
 const mediaStore = useMediaStore()
 const worksStore = useWorksStore()
 const matchesStore = useMatchesStore()
 
-const currentTab = ref('MEMBER')
 const tabs = computed(() => [
   { label: t('upload.member'), value: 'MEMBER' },
   { label: t('upload.media'), value: 'MEDIA' },
@@ -33,6 +37,14 @@ const tabs = computed(() => [
   { label: t('upload.match'), value: 'MATCH' },
   { label: t('upload.chronicle'), value: 'CHRONICLE' }
 ])
+
+const visibleTabs = computed(() => {
+  if (authStore.user?.role === 'ADMIN') return tabs.value
+  return tabs.value.filter(t => t.value !== 'MEMBER')
+})
+
+const defaultTab = computed(() => visibleTabs.value[0]?.value || 'MEDIA')
+const currentTab = ref(defaultTab.value)
 
 const tabsRef = ref<HTMLDivElement | null>(null)
 
@@ -49,6 +61,7 @@ const scrollTabIntoCenter = (tabValue: string, behavior: ScrollBehavior = 'smoot
 }
 
 const setTab = async (tabValue: string) => {
+  if (!visibleTabs.value.some(t => t.value === tabValue)) return
   currentTab.value = tabValue
   await nextTick()
   scrollTabIntoCenter(tabValue)
@@ -60,8 +73,12 @@ const message = ref({ type: '', text: '' })
 // Member Form
 const memberForm = ref({
   displayName: '',
-  team: '' as 'RED' | 'BLUE' | ''
+  team: '' as 'RED' | 'BLUE' | '',
+  familyId: ''
 })
+
+const newFamilyLabel = ref('')
+const creatingFamily = ref(false)
 
 // Media Form
 const mediaForm = ref({
@@ -76,6 +93,7 @@ const workForm = ref({
   type: 'ARTICLE' as 'ARTICLE' | 'POEM',
   title: '',
   authorId: '',
+  authorName: '',
   date: '',
   content: ''
 })
@@ -118,6 +136,11 @@ const typeOptions = [
 const memberOptions = computed(() => [
   { label: 'Unknown/None', value: '' },
   ...membersStore.members.map(m => ({ label: m.displayName, value: m.id }))
+])
+
+const familyOptions = computed(() => [
+  { label: 'No Family', value: '' },
+  ...familiesStore.families.map(f => ({ label: f.label, value: f.id }))
 ])
 
 const participantOptions = computed(() => [
@@ -180,19 +203,42 @@ const loadingMessage = ref('')
 const normalizeToYmd = (value: string | undefined | null) => {
   const raw = (value || '').trim()
   if (!raw) return ''
-  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/)
-  if (m) return m[1]
+  // ISO / slash / dot date anywhere in the string
+  const iso = raw.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (iso) {
+    return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`
+  }
+  // Chinese date: 2024年05月20日
+  const cn = raw.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/)
+  if (cn) {
+    return `${cn[1]}-${cn[2].padStart(2, '0')}-${cn[3].padStart(2, '0')}`
+  }
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString().slice(0, 10)
 }
 
-const onWorkParsed = (data: { title?: string, content?: string, date?: string, description?: string }) => {
-  if (data.title) workForm.value.title = data.title
-  if (data.content) workForm.value.content = data.content
+const onWorkParsed = (data: { title?: string, content?: string, date?: string, description?: string, author?: string }) => {
+  console.log('[SmartImport] parsed:', data)
+  if (data.title) workForm.value.title = data.title.trim()
+  if (data.content) workForm.value.content = data.content.trim()
   if (data.date) {
     const ymd = normalizeToYmd(data.date)
+    console.log('[SmartImport] normalized date:', ymd, 'from', data.date)
     if (ymd) workForm.value.date = ymd
+  }
+  if (data.author) {
+    const name = data.author.trim()
+    const matched = membersStore.members.find(m =>
+      m.displayName.trim().toLowerCase() === name.toLowerCase()
+    )
+    if (matched) {
+      workForm.value.authorId = matched.id
+      workForm.value.authorName = ''
+    } else {
+      workForm.value.authorId = ''
+      workForm.value.authorName = name
+    }
   }
 }
 
@@ -209,16 +255,33 @@ const showMessage = (type: 'success' | 'error', text: string) => {
   setTimeout(() => { message.value = { type: '', text: '' } }, 5000)
 }
 
+const createFamily = async () => {
+  const label = newFamilyLabel.value.trim()
+  if (!label) return
+  try {
+    creatingFamily.value = true
+    const family = await familiesStore.createFamily(label)
+    memberForm.value.familyId = family.id
+    newFamilyLabel.value = ''
+    showMessage('success', `Family "${family.label}" created`)
+  } catch (e: any) {
+    showMessage('error', e.response?.data?.error?.message || e.message || 'Failed to create family')
+  } finally {
+    creatingFamily.value = false
+  }
+}
+
 const submitMember = async () => {
   try {
     loading.value = true
     if (!memberForm.value.displayName) throw new Error('Display Name is required')
     await membersService.createMember({
       displayName: memberForm.value.displayName,
-      team: memberForm.value.team || undefined
+      team: memberForm.value.team || undefined,
+      familyId: memberForm.value.familyId || undefined
     })
     showMessage('success', t('upload.success'))
-    memberForm.value = { displayName: '', team: '' }
+    memberForm.value = { displayName: '', team: '', familyId: '' }
     membersStore.fetchMembers() // refresh
   } catch (e: any) {
     showMessage('error', e.message || t('upload.error'))
@@ -262,7 +325,7 @@ const submitMedia = async () => {
             }
           }
         } catch (err) {
-          console.warn('EXIF parsing failed for', file.name, err)
+          // EXIF parsing failed: fall back to file.lastModified
         }
 
         // Fallback to file.lastModified
@@ -308,11 +371,12 @@ const submitWork = async () => {
       type: workForm.value.type,
       title: workForm.value.title,
       content: workForm.value.content,
-      authorId: workForm.value.authorId || undefined,
+      authorId: workForm.value.authorName ? undefined : workForm.value.authorId || undefined,
+      authorName: workForm.value.authorName?.trim() || undefined,
       date: workForm.value.date
     })
     showMessage('success', t('upload.success'))
-    workForm.value = { type: 'ARTICLE', title: '', content: '', authorId: '', date: '' }
+    workForm.value = { type: 'ARTICLE', title: '', content: '', authorId: '', authorName: '', date: '' }
   } catch (e: any) {
     showMessage('error', e.message || t('upload.error'))
   } finally {
@@ -386,9 +450,12 @@ const submitChronicle = async () => {
 
 onMounted(() => {
   const queryTab = route.query.tab as string
-  if (queryTab && tabs.value.some(t => t.value === queryTab)) {
+  if (queryTab && visibleTabs.value.some(t => t.value === queryTab)) {
     currentTab.value = queryTab
+  } else {
+    currentTab.value = defaultTab.value
   }
+  familiesStore.fetchFamilies()
   membersStore.fetchMembers()
   mediaStore.fetchMediaList()
   worksStore.fetchWorks()
@@ -396,14 +463,14 @@ onMounted(() => {
 })
 
 watch(() => route.query.tab, async (newTab) => {
-  if (newTab && typeof newTab === 'string' && tabs.value.some(t => t.value === newTab)) {
+  if (newTab && typeof newTab === 'string' && visibleTabs.value.some(t => t.value === newTab)) {
     currentTab.value = newTab
     await nextTick()
     scrollTabIntoCenter(currentTab.value)
   }
 })
 
-watch(tabs, async () => {
+watch(visibleTabs, async () => {
   await nextTick()
   scrollTabIntoCenter(currentTab.value, 'auto')
 }, { deep: true })
@@ -424,7 +491,7 @@ watch(currentTab, async () => {
 
     <div class="tabs-minimal delay-4 animate-slide-up" ref="tabsRef">
       <button 
-        v-for="tab in tabs" 
+        v-for="tab in visibleTabs" 
         :key="tab.value"
         class="tab-btn"
         :data-tab="tab.value"
@@ -451,6 +518,28 @@ watch(currentTab, async () => {
         <div class="form-group">
           <label class="form-label">TEAM</label>
           <OrganicDropdown v-model="memberForm.team" :options="teamOptions" placeholder="None" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">FAMILY</label>
+          <OrganicDropdown v-model="memberForm.familyId" :options="familyOptions" placeholder="No Family" />
+          <div v-if="!memberForm.familyId" class="family-creator">
+            <input
+              v-model="newFamilyLabel"
+              type="text"
+              class="form-input"
+              placeholder="Or type a new family name..."
+              @keydown.enter.prevent="createFamily"
+            />
+            <button
+              type="button"
+              class="action-btn"
+              :disabled="!newFamilyLabel.trim() || creatingFamily"
+              @click="createFamily"
+            >
+              <span v-if="creatingFamily">...</span>
+              <span v-else>+ Create Family</span>
+            </button>
+          </div>
         </div>
         <button type="submit" class="editorial-btn" :disabled="loading">
           <span v-if="loading">{{ loadingMessage || '...' }}</span>
@@ -498,7 +587,19 @@ watch(currentTab, async () => {
         </div>
         <div class="form-group">
           <label class="form-label">AUTHOR</label>
-          <OrganicDropdown v-model="workForm.authorId" :options="memberOptions" placeholder="Unknown" />
+          <OrganicDropdown
+            v-model="workForm.authorId"
+            :options="memberOptions"
+            placeholder="选择已有队员"
+            @change="workForm.authorName = ''"
+          />
+          <input
+            v-model="workForm.authorName"
+            type="text"
+            class="form-input author-name-input"
+            placeholder="或输入新作者名"
+            @input="workForm.authorId = ''"
+          />
         </div>
         <div class="form-group">
           <label class="form-label">DATE (YYYY-MM-DD) *</label>
@@ -506,7 +607,7 @@ watch(currentTab, async () => {
         </div>
         <div class="form-group">
           <label class="form-label">CONTENT *</label>
-          <textarea v-model="workForm.content" class="form-textarea" rows="8" required></textarea>
+          <MarkdownEditor v-model="workForm.content" placeholder="输入文章正文..." />
         </div>
         <button type="submit" class="editorial-btn" :disabled="loading">
           <span v-if="loading">...</span>
@@ -557,7 +658,7 @@ watch(currentTab, async () => {
         </div>
         <div class="form-group">
           <label class="form-label">DESCRIPTION</label>
-          <textarea v-model="chronicleForm.description" class="form-textarea" rows="4"></textarea>
+          <MarkdownEditor v-model="chronicleForm.description" placeholder="输入纪事描述..." :rows="6" />
         </div>
         <div class="form-group">
           <label class="form-label">MEDIA (IMAGE/VIDEO)</label>
@@ -752,6 +853,11 @@ watch(currentTab, async () => {
   line-height: 1.6;
 }
 
+.author-name-input {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+}
+
 .form-file {
   font-family: var(--sans);
   font-size: 0.9rem;
@@ -777,6 +883,24 @@ watch(currentTab, async () => {
 .form-file::file-selector-button:hover {
   background: var(--text-h);
   color: var(--surface);
+}
+
+.family-creator {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.family-creator .form-input {
+  flex: 1;
+  margin: 0;
+}
+
+.family-creator .action-btn {
+  white-space: nowrap;
+  padding: 0.6rem 1rem;
+  font-size: 0.7rem;
 }
 
 .help-text {

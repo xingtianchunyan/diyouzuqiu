@@ -5,7 +5,9 @@ import { pipeline } from 'stream/promises'
 import type { MultipartFile } from '@fastify/multipart'
 
 // Base storage directory
-export const STORAGE_ROOT = path.resolve(process.cwd(), 'storage')
+export const STORAGE_ROOT = process.env.STORAGE_ROOT
+  ? path.resolve(process.env.STORAGE_ROOT)
+  : path.resolve(process.cwd(), 'storage')
 
 // Ensure a directory exists
 export const ensureDir = async (dirPath: string) => {
@@ -119,5 +121,10 @@ export async function saveAvatarFile(
 }
 
 export function getAbsoluteStoragePath(relativePath: string): string {
-  return path.join(STORAGE_ROOT, relativePath)
+  const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, '')
+  const absolute = path.resolve(STORAGE_ROOT, normalized)
+  if (!absolute.startsWith(path.resolve(STORAGE_ROOT))) {
+    throw new Error('Invalid storage path')
+  }
+  return absolute
 }

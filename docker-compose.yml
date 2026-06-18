@@ -1,0 +1,75 @@
+services:
+  diyou-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: diyou-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:-file:/data/db/diyou.db}
+      - STORAGE_ROOT=${STORAGE_ROOT:-/data/storage}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@diyou.test}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-diyou2024}
+    volumes:
+      - diyou-db:/data/db
+      - diyou-storage:/data/storage
+    networks:
+      - diyou-net
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  diyou-web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: diyou-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:-localhost}
+      - BACKEND_URL=diyou-backend:3000
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - diyou-net
+    depends_on:
+      diyou-backend:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: diyou-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 86400 --cleanup --label-enable
+    profiles:
+      - watchtower
+
+volumes:
+  diyou-db:
+  diyou-storage:
+  caddy-data:
+  caddy-config:
+
+networks:
+  diyou-net:
+    driver: bridge

@@ -20,6 +20,7 @@ export interface Match {
 
 export interface MatchDetail extends Match {
   participants: MatchParticipant[]
+  notes?: string
 }
 
 export const matchesService = {
@@ -41,6 +42,17 @@ export const matchesService = {
     return apiClient.get<MatchDetail>(`/matches/${id}`)
   },
   
+  updateMatch(id: string, data: {
+    playedAt?: string
+    redScore?: number
+    blueScore?: number
+    mvpMemberId?: string
+    notes?: string
+    participantIds?: MatchParticipant[]
+  }) {
+    return apiClient.put<MatchDetail>(`/matches/${id}`, data)
+  },
+
   deleteMatch(id: string) {
     return apiClient.delete(`/matches/${id}`)
   }

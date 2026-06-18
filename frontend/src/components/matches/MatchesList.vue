@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'delete', match: Match): void
+  (e: 'edit', match: Match): void
 }>()
 
 const groupedMatches = computed(() => {
@@ -67,6 +68,7 @@ const groupedMatches = computed(() => {
             </div>
             
             <div class="match-actions">
+              <button v-if="props.canDelete && props.canDelete(match)" class="edit-btn" @click.stop="emit('edit', match)" title="Edit">✎</button>
               <button v-if="props.canDelete && props.canDelete(match)" class="delete-btn" @click.stop="emit('delete', match)" title="Delete">×</button>
             </div>
           </div>
@@ -188,13 +190,15 @@ const groupedMatches = computed(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
 }
 
+.edit-btn,
 .delete-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   line-height: 1;
   padding: 0 4px;
   cursor: pointer;
@@ -202,8 +206,14 @@ const groupedMatches = computed(() => {
   transition: opacity 0.2s, color 0.2s;
 }
 
+.match-row:hover .edit-btn,
 .match-row:hover .delete-btn {
   opacity: 0.6;
+}
+
+.edit-btn:hover {
+  color: var(--text-h);
+  opacity: 1 !important;
 }
 
 .delete-btn:hover {

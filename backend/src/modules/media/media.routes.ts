@@ -4,12 +4,36 @@ import { saveMediaFile, getAbsoluteStoragePath } from '../../lib/storage.js'
 import fs from 'fs'
 import path from 'path'
 
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif']
+const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska']
+const ALLOWED_MEDIA_TYPES = [...ALLOWED_PHOTO_TYPES, ...ALLOWED_VIDEO_TYPES]
+
+const PHOTO_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif']
+const VIDEO_EXTS = ['.mp4', '.mov', '.avi', '.mkv']
+const ALLOWED_EXTS = [...PHOTO_EXTS, ...VIDEO_EXTS]
+
+function isAllowedFile(filename: string, mimetype: string): boolean {
+  const ext = path.extname(filename).toLowerCase()
+  if (!ALLOWED_EXTS.includes(ext)) return false
+  if (!ALLOWED_MEDIA_TYPES.includes(mimetype)) return false
+  return true
+}
+
 export const mediaRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/media', async (request, reply) => {
+  app.post('/media', { preValidation: [app.authenticate] }, async (request, reply) => {
     // We expect multipart form data
     const data = await request.file()
     if (!data) {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'No file uploaded' } })
+    }
+
+    if (!isAllowedFile(data.filename, data.mimetype)) {
+      return reply.code(400).send({
+        error: {
+          code: 'INVALID_FILE_TYPE',
+          message: `Only photos (${PHOTO_EXTS.join(', ')}) and videos (${VIDEO_EXTS.join(', ')}) are allowed`
+        }
+      })
     }
 
     // Try to get metadata from fields if any
@@ -29,7 +53,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
 
     const ext = path.extname(data.filename).toLowerCase()
     let type: string = 'PHOTO'
-    if (['.mp4', '.mov', '.avi', '.mkv'].includes(ext)) {
+    if (VIDEO_EXTS.includes(ext)) {
       type = 'VIDEO'
     }
 
@@ -175,10 +199,25 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
   app.put('/media/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = request.body as { takenAt?: string | null; year?: number | null; personTagIds?: string[] }
+    const user = request.user
 
-    const media = await prisma.mediaAsset.findUnique({ where: { id } })
+    const media = await prisma.mediaAsset.findUnique({
+      where: { id },
+      include: { personTags: true }
+    })
     if (!media) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Media not found' } })
+    }
+
+    if (user.role !== 'ADMIN') {
+      const isUploader = media.createdByUserId === user.id
+      let isOnlyMe = false
+      if (user.memberId) {
+        isOnlyMe = media.personTags.length === 1 && media.personTags[0].memberId === user.memberId
+      }
+      if (!isUploader && !isOnlyMe) {
+        return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You can only edit media you uploaded or that is exclusively tagged with your member profile' } })
+      }
     }
 
     const updateData: any = {}

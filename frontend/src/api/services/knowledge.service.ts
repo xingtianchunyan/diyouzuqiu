@@ -10,7 +10,10 @@ export interface PlannerConstraints {
   budget: number
   date: string
   location: string
-  style: string
+  durationHours?: number
+  style?: string
+  mustHave?: string[]
+  avoid?: string[]
   notes?: string
 }
 

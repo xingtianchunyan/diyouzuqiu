@@ -1,14 +1,30 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import bcrypt from 'bcryptjs'
+import { validateBody, z } from '../../lib/validate.js'
+import { validatePassword } from '../../lib/password.js'
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1)
+})
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8)
+})
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/auth/login', async (request, reply) => {
-    const { email, password } = request.body as any
-
-    if (!email || !password) {
-      return reply.code(400).send({ message: 'Email and password are required' })
+  app.post('/auth/login', {
+    preValidation: validateBody(loginSchema),
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute'
+      }
     }
+  }, async (request, reply) => {
+    const { email, password } = (request as any).validatedBody as { email: string; password: string }
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
@@ -70,11 +86,43 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       where: { id: request.user.id },
       select: { id: true, email: true, role: true, memberId: true }
     })
-    
+
     if (!user) {
       return reply.code(404).send({ message: 'User not found' })
     }
-    
+
     return user
+  })
+
+  app.post('/auth/change-password', {
+    preValidation: [app.authenticate, validateBody(changePasswordSchema)]
+  }, async (request, reply) => {
+    const { currentPassword, newPassword } = (request as any).validatedBody as {
+      currentPassword: string
+      newPassword: string
+    }
+
+    const passwordCheck = validatePassword(newPassword)
+    if (!passwordCheck.valid) {
+      return reply.code(400).send({ error: { code: 'WEAK_PASSWORD', message: passwordCheck.message } })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: request.user.id } })
+    if (!user) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } })
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password)
+    if (!isValid) {
+      return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'Current password is incorrect' } })
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    })
+
+    return { message: 'Password changed successfully' }
   })
 }

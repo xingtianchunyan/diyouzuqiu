@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { Work } from '../../api/services/works.service'
+import MarkdownRenderer from '../editor/MarkdownRenderer.vue'
 
 const props = defineProps<{
   work: Work | null
@@ -13,20 +15,11 @@ const emit = defineEmits<{
   (e: 'delete', work: Work): void
 }>()
 
-const paragraphs = computed(() => {
-  const text = props.work?.content ?? ''
-  if (!text) return []
-  return text
-    .replace(/\r\n/g, '\n')
-    .split(/\n{2,}/g)
-    .map(p => p.trim())
-    .filter(Boolean)
-})
-
 const metaLine = computed(() => {
   if (!props.work) return ''
   const parts: string[] = []
-  if (props.work.authorMember?.displayName) parts.push(props.work.authorMember.displayName)
+  const author = props.work.authorMember?.displayName || props.work.authorName
+  if (author) parts.push(author)
   else if (props.work.authorMemberId) parts.push(props.work.authorMemberId)
   if (props.work.date) parts.push(props.work.date.substring(0, 10))
   return parts.join(' · ')
@@ -65,6 +58,15 @@ onUnmounted(() => {
             <div class="topbar-type" v-if="props.work">{{ props.work.type }}</div>
           </div>
           <div class="topbar-right">
+            <RouterLink
+              v-if="props.work"
+              :to="`/works/${props.work.id}`"
+              class="reader-link-btn"
+              title="打开独立页面"
+              @click.stop
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </RouterLink>
             <button 
               v-if="props.work && props.canDelete && props.canDelete(props.work)" 
               class="reader-delete-btn"
@@ -91,10 +93,8 @@ onUnmounted(() => {
           </div>
 
           <div class="reader-content">
-            <p v-for="(p, idx) in paragraphs" :key="idx" class="reader-paragraph">
-              {{ p }}
-            </p>
-            <p v-if="paragraphs.length === 0" class="reader-paragraph reader-empty">No content.</p>
+            <MarkdownRenderer :markdown="props.work?.content || ''" />
+            <p v-if="!props.work?.content" class="reader-paragraph reader-empty">No content.</p>
           </div>
         </article>
       </div>
@@ -180,7 +180,8 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
-.reader-delete-btn {
+.reader-delete-btn,
+.reader-link-btn {
   width: 40px;
   height: 40px;
   border-radius: 10px;
@@ -192,6 +193,11 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.reader-link-btn:hover {
+  color: var(--text-h);
+  background: var(--surface-hover);
 }
 
 .reader-delete-btn:hover {

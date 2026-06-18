@@ -14,5 +14,9 @@ export interface YearAggregation {
 export const yearsService = {
   getYearAggregation(year: number) {
     return apiClient.get<YearAggregation>(`/years/${year}`)
+  },
+
+  getYearsOverview() {
+    return apiClient.get<{ years: number[] }>('/years/overview')
   }
 }

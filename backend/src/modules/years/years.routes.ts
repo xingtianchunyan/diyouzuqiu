@@ -4,6 +4,33 @@ import { getAbsoluteStoragePath } from '../../lib/storage.js'
 import fs from 'fs'
 
 export const yearsRoutes: FastifyPluginAsync = async (app) => {
+  // GET /years/overview
+  app.get('/years/overview', { preValidation: [app.authenticate] }, async (request, reply) => {
+    const [mediaYears, workYears, matchYears, chronicleYears] = await Promise.all([
+      prisma.mediaAsset.groupBy({ by: ['year'] }),
+      prisma.work.groupBy({ by: ['year'] }),
+      prisma.match.groupBy({ by: ['playedAt'] }),
+      prisma.chronicleEvent.groupBy({ by: ['year'] })
+    ])
+
+    const yearsWithData = new Set<number>()
+
+    for (const m of mediaYears) {
+      if (m.year) yearsWithData.add(m.year)
+    }
+    for (const w of workYears) {
+      if (w.year) yearsWithData.add(w.year)
+    }
+    for (const m of matchYears) {
+      if (m.playedAt) yearsWithData.add(m.playedAt.getFullYear())
+    }
+    for (const c of chronicleYears) {
+      if (c.year) yearsWithData.add(c.year)
+    }
+
+    return { years: Array.from(yearsWithData).sort((a, b) => a - b) }
+  })
+
   // GET /years/:year
   app.get('/years/:year', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { year: yearParam } = request.params as { year: string }
@@ -24,6 +51,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           takenAt: true,
           year: true,
           storagePath: true,
+          createdByUserId: true,
           personTags: {
             include: {
               member: {
@@ -45,7 +73,8 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           type: true,
           title: true,
           authorMemberId: true,
-          year: true
+          year: true,
+          createdByUserId: true
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -64,6 +93,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           redScore: true,
           blueScore: true,
           mvpMemberId: true,
+          createdByUserId: true,
           mvpMember: {
             select: {
               id: true,
@@ -83,6 +113,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
           happenedAt: true,
           title: true,
           description: true,
+          createdByUserId: true,
           primaryMedia: {
             select: {
               id: true,
@@ -170,6 +201,7 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
         type: m.type,
         takenAt: m.takenAt,
         year: m.year,
+        createdByUserId: m.createdByUserId,
         personTags: m.personTags.map((pt: any) => ({
           id: pt.memberId,
           displayName: pt.member.displayName
@@ -179,8 +211,9 @@ export const yearsRoutes: FastifyPluginAsync = async (app) => {
         id: w.id,
         type: w.type,
         title: w.title,
-        authorId: w.authorMemberId,
-        year: w.year
+        authorMemberId: w.authorMemberId,
+        year: w.year,
+        createdByUserId: w.createdByUserId
       })),
       matches,
       events

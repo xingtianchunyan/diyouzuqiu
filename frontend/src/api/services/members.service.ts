@@ -20,7 +20,7 @@ export const membersService = {
     return apiClient.get<Member[]>('/members', { params })
   },
   
-  createMember(data: { displayName: string; team?: 'RED' | 'BLUE' }) {
+  createMember(data: { displayName: string; team?: 'RED' | 'BLUE'; familyId?: string }) {
     return apiClient.post<Member>('/members', data)
   },
   

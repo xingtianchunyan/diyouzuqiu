@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { knowledgeService } from '../api/services/knowledge.service'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 const plannerDocs = ref<any[]>([])
 const loading = ref(false)
+const searchQuery = ref('')
 
 const showModal = ref(false)
 const selectedDoc = ref<any>(null)
@@ -13,7 +14,7 @@ const selectedDoc = ref<any>(null)
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await knowledgeService.getKnowledgeList()
+    const res = await knowledgeService.getKnowledgeList(searchQuery.value ? { q: searchQuery.value } : undefined)
     plannerDocs.value = res.data.map((d: any) => ({
       id: d.id,
       type: d.category === 'PLANNER_CHAT' ? '对话记录' : '上传文件',
@@ -22,13 +23,17 @@ const loadData = async () => {
       date: new Date(d.createdAt).toLocaleDateString()
     }))
   } catch (err) {
-    console.error(err)
+    // Silent: grid will be empty
   } finally {
     loading.value = false
   }
 }
 
 onMounted(loadData)
+
+watch(searchQuery, () => {
+  loadData()
+})
 
 const openDoc = (doc: any) => {
   selectedDoc.value = doc
@@ -55,6 +60,15 @@ const renderMarkdown = (text: string) => {
     </div>
 
     <div class="divider-y delay-3 animate-slide-up"></div>
+
+    <div class="search-row delay-4 animate-slide-up">
+      <input
+        v-model="searchQuery"
+        type="text"
+        class="search-input"
+        placeholder="搜索知识库标题或内容..."
+      />
+    </div>
 
     <div class="content-area delay-5 animate-slide-up">
       <div v-if="loading" class="loading-state">加载中...</div>
@@ -100,6 +114,28 @@ const renderMarkdown = (text: string) => {
   padding: 2rem;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.search-row {
+  margin-top: 1.5rem;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  color: var(--text-h);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: var(--text-h);
 }
 
 .doc-grid {

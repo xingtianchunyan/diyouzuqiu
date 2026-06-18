@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'select', item: Media): void
   (e: 'delete', id: string): void
+  (e: 'edit', item: Media): void
 }>()
 
 const groupedMedia = computed(() => {
@@ -58,14 +59,22 @@ const handleDelete = (id: string) => {
         <div v-for="item in group.items" :key="item.id" class="media-frame" @click="emit('select', item)">
           <img v-if="item.type === 'PHOTO'" :src="getMediaUrl(item.id)" class="media-content" loading="lazy" />
           <video v-else-if="item.type === 'VIDEO'" :src="getMediaUrl(item.id)" class="media-content" controls preload="metadata"></video>
-          <button 
-            v-if="canDelete && canDelete(item)" 
-            class="delete-media-btn" 
-            @click.stop="handleDelete(item.id)"
-            title="Delete"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-          </button>
+          <div v-if="canDelete && canDelete(item)" class="media-actions">
+            <button 
+              class="edit-media-btn" 
+              @click.stop="emit('edit', item)"
+              title="Edit"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button 
+              class="delete-media-btn" 
+              @click.stop="handleDelete(item.id)"
+              title="Delete"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -106,11 +115,24 @@ const handleDelete = (id: string) => {
   transform: scale(1.03);
 }
 
-.delete-media-btn {
+.media-actions {
   position: absolute;
   top: 4px;
   right: 4px;
-  background: rgba(229, 57, 53, 0.9);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.media-frame:hover .media-actions {
+  opacity: 1;
+}
+
+.edit-media-btn,
+.delete-media-btn {
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   border: none;
   border-radius: 4px;
@@ -120,14 +142,16 @@ const handleDelete = (id: string) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 10;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
-.delete-media-btn:hover {
+
+.edit-media-btn:hover {
+  background: rgba(56, 142, 60, 0.9);
   transform: scale(1.1);
 }
-.media-frame:hover .delete-media-btn {
-  opacity: 1;
+
+.delete-media-btn:hover {
+  background: rgba(229, 57, 53, 0.9);
+  transform: scale(1.1);
 }
 </style>
