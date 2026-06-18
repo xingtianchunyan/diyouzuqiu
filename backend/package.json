@@ -23,7 +23,7 @@
     "@fastify/static": "^9.1.0",
     "@mozilla/readability": "^0.6.0",
     "@prisma/client": "^6.7.0",
-    "axios": "^1.15.1",
+    "axios": "^1.18.0",
     "bcryptjs": "^3.0.2",
     "cheerio": "^1.2.0",
     "dotenv": "^16.5.0",

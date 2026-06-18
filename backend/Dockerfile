@@ -22,8 +22,11 @@ COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/dist ./dist
 
-# Ensure data directories exist
-RUN mkdir -p /data/db /data/storage
+# Ensure data directories exist and are writable by non-root user
+RUN mkdir -p /data/db /data/storage && chown -R node:node /data /app
+
+# Run as non-root user
+USER node
 
 ENV NODE_ENV=production
 ENV PORT=3000

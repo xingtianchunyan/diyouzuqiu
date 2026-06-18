@@ -10,5 +10,13 @@ RUN npm run build
 
 # Production image: Caddy serves the static frontend
 FROM caddy:2-alpine
-COPY --from=builder /app/dist /srv
-COPY web/Caddyfile /etc/caddy/Caddyfile
+
+# Create non-root user directories and set permissions
+RUN mkdir -p /config/caddy /data/caddy && chown -R caddy:caddy /srv /config /data
+
+COPY --from=builder --chown=caddy:caddy /app/dist /srv
+COPY --chown=caddy:caddy web/Caddyfile /etc/caddy/Caddyfile
+
+USER caddy
+
+EXPOSE 80 443
