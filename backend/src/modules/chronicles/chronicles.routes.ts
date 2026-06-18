@@ -1,13 +1,42 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
+import { validateBody, validateQuery, z } from '../../lib/validate.js'
+
+const dateQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+})
+
+const yearQuerySchema = z.object({
+  year: z.string().regex(/^\d{4}$/, 'Year must be YYYY').optional(),
+  memberId: z.string().optional()
+})
+
+const createChronicleSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional(),
+  happenedAt: z.string().datetime({ message: 'happenedAt must be ISO 8601 datetime' }),
+  mediaId: z.string().optional(),
+  memberIds: z.array(z.string()).max(100).optional(),
+  mediaAssetIds: z.array(z.string()).max(100).optional(),
+  workIds: z.array(z.string()).max(100).optional(),
+  matchIds: z.array(z.string()).max(100).optional()
+})
+
+const updateChronicleSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).optional(),
+  happenedAt: z.string().datetime({ message: 'happenedAt must be ISO 8601 datetime' }).optional(),
+  mediaId: z.string().optional().nullable(),
+  memberIds: z.array(z.string()).max(100).optional(),
+  mediaAssetIds: z.array(z.string()).max(100).optional(),
+  workIds: z.array(z.string()).max(100).optional(),
+  matchIds: z.array(z.string()).max(100).optional()
+})
 
 export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
   // GET /chronicles/daily-materials
-  app.get('/daily-materials', async (request, reply) => {
-    const { date } = request.query as { date?: string }
-    if (!date) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Date is required' } })
-    }
+  app.get('/daily-materials', { preValidation: [app.authenticate, validateQuery(dateQuerySchema)] }, async (request, reply) => {
+    const { date } = (request as any).validatedQuery as { date: string }
 
     const startOfDay = new Date(`${date}T00:00:00.000Z`)
     const endOfDay = new Date(`${date}T23:59:59.999Z`)
@@ -50,8 +79,8 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
     return { mediaAssets, works, matches }
   })
 
-  app.post('/chronicles', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const body = request.body as {
+  app.post('/chronicles', { preValidation: [app.authenticate, validateBody(createChronicleSchema)] }, async (request, reply) => {
+    const body = (request as any).validatedBody as {
       title: string
       description?: string
       happenedAt: string
@@ -60,10 +89,6 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
       mediaAssetIds?: string[]
       workIds?: string[]
       matchIds?: string[]
-    }
-
-    if (!body.title || !body.happenedAt) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Title and happenedAt are required' } })
     }
 
     const happenedAtDate = new Date(body.happenedAt)
@@ -89,8 +114,8 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send(chronicle)
   })
 
-  app.get('/chronicles', async (request, reply) => {
-    const query = request.query as { year?: string; memberId?: string }
+  app.get('/chronicles', { preValidation: [app.authenticate, validateQuery(yearQuerySchema)] }, async (request, reply) => {
+    const query = (request as any).validatedQuery as { year?: string; memberId?: string }
     const where: any = {}
 
     if (query.year) {
@@ -172,7 +197,7 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // PUT /chronicles/:id
-  app.put('/chronicles/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
+  app.put('/chronicles/:id', { preValidation: [app.authenticate, validateBody(updateChronicleSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const user = request.user as { id: string; role: string; memberId?: string }
 
@@ -192,11 +217,11 @@ export const chroniclesRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'Insufficient permissions to update chronicle event' } })
     }
 
-    const body = request.body as {
+    const body = (request as any).validatedBody as {
       title?: string
       description?: string
       happenedAt?: string
-      mediaId?: string
+      mediaId?: string | null
       memberIds?: string[]
       mediaAssetIds?: string[]
       workIds?: string[]

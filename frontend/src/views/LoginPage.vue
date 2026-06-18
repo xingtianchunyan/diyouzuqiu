@@ -12,6 +12,25 @@
       </div>
 
       <div class="login-card delay-2 animate-slide-up">
+        <div class="login-tabs">
+          <button
+            type="button"
+            class="login-tab"
+            :class="{ active: mode === 'password' }"
+            @click="mode = 'password'"
+          >
+            {{ $t('auth.passwordLogin') }}
+          </button>
+          <button
+            type="button"
+            class="login-tab"
+            :class="{ active: mode === 'otp' }"
+            @click="mode = 'otp'"
+          >
+            {{ $t('auth.otpLogin') }}
+          </button>
+        </div>
+
         <form class="login-form" @submit.prevent="handleLogin">
           <div class="form-group">
             <label for="email" class="form-label">
@@ -28,7 +47,7 @@
             />
           </div>
 
-          <div class="form-group">
+          <div v-if="mode === 'password'" class="form-group">
             <label for="password" class="form-label">
               {{ $t('auth.password') }}
             </label>
@@ -41,6 +60,36 @@
               required
               class="form-input"
             />
+          </div>
+
+          <div v-else class="form-group">
+            <label for="code" class="form-label">
+              {{ $t('auth.verificationCode') }}
+            </label>
+            <div class="otp-input-row">
+              <input
+                id="code"
+                v-model="code"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                autocomplete="one-time-code"
+                required
+                class="form-input otp-input"
+                :placeholder="$t('auth.verificationCode')"
+              />
+              <button
+                type="button"
+                class="otp-send-btn"
+                :disabled="sendingCode || countdown > 0"
+                @click="handleSendCode"
+              >
+                <span v-if="sendingCode">{{ $t('auth.sending') }}</span>
+                <span v-else-if="countdown > 0">{{ countdown }}s</span>
+                <span v-else>{{ $t('auth.sendCode') }}</span>
+              </button>
+            </div>
           </div>
 
           <div v-if="error" class="form-error">
@@ -60,30 +109,83 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { apiClient } from '../api/client'
+import { authService } from '../api/services/auth.service'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 
+const mode = ref<'password' | 'otp'>('password')
 const email = ref('')
 const password = ref('')
+const code = ref('')
+const codeId = ref('')
 const loading = ref(false)
 const error = ref('')
+const sendingCode = ref(false)
+const countdown = ref(0)
+
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+const startCountdown = () => {
+  countdown.value = 60
+  countdownTimer = setInterval(() => {
+    if (countdown.value > 0) {
+      countdown.value--
+    } else if (countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }, 1000)
+}
+
+const handleSendCode = async () => {
+  if (!email.value) {
+    error.value = t('auth.emailRequired')
+    return
+  }
+
+  sendingCode.value = true
+  error.value = ''
+
+  try {
+    const response = await authService.sendEmailOtp(email.value)
+    codeId.value = response.data.codeId
+
+    // In non-production environments the backend returns the code directly.
+    if (response.data.code) {
+      code.value = response.data.code
+    }
+
+    startCountdown()
+  } catch (err: any) {
+    error.value = err.response?.data?.error?.message || t('auth.otpLoginFailed')
+  } finally {
+    sendingCode.value = false
+  }
+}
 
 const handleLogin = async () => {
   loading.value = true
   error.value = ''
 
   try {
-    const response = await apiClient.post('/auth/login', {
-      email: email.value,
-      password: password.value
-    })
+    let response
+
+    if (mode.value === 'password') {
+      response = await authService.login(email.value, password.value)
+    } else {
+      if (!code.value) {
+        error.value = t('auth.codeRequired')
+        loading.value = false
+        return
+      }
+      response = await authService.loginWithEmailOtp(email.value, codeId.value, code.value)
+    }
 
     const { token, user } = response.data
 
@@ -92,11 +194,17 @@ const handleLogin = async () => {
 
     router.push('/')
   } catch (err: any) {
-    error.value = err.response?.data?.message || t('auth.loginFailed') || 'Login failed'
+    error.value = err.response?.data?.error?.message || t('auth.loginFailed')
   } finally {
     loading.value = false
   }
 }
+
+watch(mode, () => {
+  error.value = ''
+  password.value = ''
+  code.value = ''
+})
 </script>
 
 <style scoped>
@@ -154,6 +262,31 @@ const handleLogin = async () => {
   border-radius: 24px;
 }
 
+.login-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.login-tab {
+  flex: 1;
+  padding: 0.75rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.login-tab.active {
+  color: var(--text-h);
+  border-bottom-color: var(--brand);
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -192,6 +325,40 @@ const handleLogin = async () => {
 .form-input:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 2px rgba(168, 79, 56, 0.1);
+}
+
+.otp-input-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.otp-input {
+  flex: 1;
+  letter-spacing: 0.25em;
+  text-align: center;
+}
+
+.otp-send-btn {
+  padding: 0 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-h);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.otp-send-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.otp-send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .form-error {

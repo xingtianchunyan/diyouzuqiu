@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 export interface DropdownOption {
   label: string
@@ -13,7 +16,7 @@ const props = withDefaults(defineProps<{
   multiple?: boolean
   disabled?: boolean
 }>(), {
-  placeholder: 'Select an option...',
+  placeholder: undefined,
   multiple: false,
   disabled: false
 })
@@ -77,18 +80,19 @@ const selectOption = (option: DropdownOption) => {
 
 // Compute the display text for the trigger button
 const displayText = computed(() => {
+  const fallback = props.placeholder || t('common.selectOptionPlaceholder')
   if (props.multiple) {
-    if (!Array.isArray(props.modelValue) || props.modelValue.length === 0) return props.placeholder
+    if (!Array.isArray(props.modelValue) || props.modelValue.length === 0) return fallback
     const selectedLabels = props.options
       .filter(opt => props.modelValue.includes(opt.value))
       .map(opt => opt.label)
-    return selectedLabels.length > 0 ? selectedLabels.join(', ') : props.placeholder
+    return selectedLabels.length > 0 ? selectedLabels.join(', ') : fallback
   } else {
     if (props.modelValue === '' || props.modelValue === null || props.modelValue === undefined) {
-      return props.placeholder
+      return fallback
     }
     const selected = props.options.find(opt => opt.value === props.modelValue)
-    return selected ? selected.label : props.placeholder
+    return selected ? selected.label : fallback
   }
 })
 </script>
@@ -136,7 +140,7 @@ const displayText = computed(() => {
           </div>
           
           <div v-if="options.length === 0" class="option-empty">
-            No options available
+            {{ $t('common.noOptionsAvailable') }}
           </div>
         </div>
       </div>

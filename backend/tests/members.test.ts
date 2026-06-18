@@ -55,4 +55,36 @@ describe('Members API', () => {
     })
     expect(res.statusCode).toBe(400)
   })
+
+  it('POST /api/v1/members/:id/avatar rejects non-image file', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/v1/members',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { displayName: 'Avatar Test', team: 'BLUE' }
+    })
+    const memberId = create.json().id
+
+    const boundary = '----TestBoundary'
+    const htmlFile = Buffer.from('<script>alert(1)</script>')
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\n`),
+      Buffer.from('Content-Disposition: form-data; name="file"; filename="xss.html"\r\n'),
+      Buffer.from('Content-Type: text/html\r\n\r\n'),
+      htmlFile,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ])
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/members/${memberId}/avatar`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': `multipart/form-data; boundary=${boundary}`
+      },
+      payload: body
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('INVALID_AVATAR')
+  })
 })

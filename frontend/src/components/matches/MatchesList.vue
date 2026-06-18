@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Match } from '../../api/services/matches.service'
 import MonthGroupHeading from '@/components/base/MonthGroupHeading.vue'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   matchesList: Match[]
@@ -25,7 +28,7 @@ const groupedMatches = computed(() => {
   const groups: Record<string, Match[]> = {}
   for (const m of props.matchesList) {
     const d = m.playedAt ? new Date(m.playedAt) : null
-    let key = 'Unknown Date'
+    let key = t('common.unknownDate')
     if (d && !isNaN(d.getTime())) {
       key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     }
@@ -43,7 +46,7 @@ const groupedMatches = computed(() => {
 <template>
   <div class="matches-list-container">
     <div v-if="matchesList.length === 0" class="empty-archive">
-      <p class="empty-text">No match records found.</p>
+      <p class="empty-text">{{ $t('matches.noRecords') }}</p>
     </div>
     
     <div v-else>
@@ -52,24 +55,24 @@ const groupedMatches = computed(() => {
         
         <div class="match-list">
           <div v-for="match in group.items" :key="match.id" class="match-row">
-            <div class="match-date">{{ new Date(match.playedAt).toLocaleDateString() }}</div>
+            <div class="match-date">{{ new Date(match.playedAt).toLocaleDateString($i18n.locale) }}</div>
             <div class="match-score">
               <div class="score-line">
-                <span class="team red">RED {{ match.redScore }}</span>
+                <span class="team red">{{ $t('matches.team.red') }} {{ match.redScore }}</span>
                 <span class="divider">:</span>
-                <span class="team blue">BLUE {{ match.blueScore }}</span>
+                <span class="team blue">{{ $t('matches.team.blue') }} {{ match.blueScore }}</span>
               </div>
               <div class="match-mvp" v-if="highlightMvpId && match.mvpMemberId === highlightMvpId">
-                <span class="mvp-badge" title="MVP">⭐ MVP</span>
+                <span class="mvp-badge" :title="$t('matches.mvp')">{{ $t('matches.mvp') }}</span>
               </div>
               <div class="match-mvp" v-else-if="!highlightMvpId && match.mvpMember">
-                <span class="mvp-badge" title="MVP">⭐ MVP: {{ match.mvpMember.displayName }}</span>
+                <span class="mvp-badge" :title="$t('matches.mvpWithName', { name: match.mvpMember.displayName })">{{ $t('matches.mvpWithName', { name: match.mvpMember.displayName }) }}</span>
               </div>
             </div>
             
             <div class="match-actions">
-              <button v-if="props.canDelete && props.canDelete(match)" class="edit-btn" @click.stop="emit('edit', match)" title="Edit">✎</button>
-              <button v-if="props.canDelete && props.canDelete(match)" class="delete-btn" @click.stop="emit('delete', match)" title="Delete">×</button>
+              <button v-if="props.canDelete && props.canDelete(match)" class="edit-btn" @click.stop="emit('edit', match)" :title="$t('common.edit')">✎</button>
+              <button v-if="props.canDelete && props.canDelete(match)" class="delete-btn" @click.stop="emit('delete', match)" :title="$t('common.delete')">×</button>
             </div>
           </div>
         </div>

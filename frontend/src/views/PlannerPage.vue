@@ -14,7 +14,7 @@ const fileLoading = ref(false)
 const STORAGE_KEY = 'planner_chat_history'
 
 const defaultMessages: (ChatMessage & { isSystem?: boolean, parsedPlan?: any })[] = [
-  { role: 'assistant', content: '您好！我是年会策划 AI 助手。请告诉我您对本次年会的期望（例如：参与人数、预算、地点、风格、必须包含的环节等）。您也可以通过底部的附件按钮上传过往的文档供我参考。' }
+  { role: 'assistant', content: t('planner.greeting') }
 ]
 
 const messages = ref<(ChatMessage & { isSystem?: boolean, parsedPlan?: any })[]>([...defaultMessages])
@@ -38,23 +38,23 @@ watch(messages, (newVal) => {
 }, { deep: true })
 
 const clearHistory = () => {
-  if (confirm('确定要清空当前对话记录吗？')) {
+  if (confirm(t('confirm.clearChatHistory'))) {
     messages.value = [...defaultMessages]
     localStorage.removeItem(STORAGE_KEY)
   }
 }
 
 const resultTabs = [
-  { id: 'plan', label: '策划案' },
-  { id: 'budget', label: '预算表' },
-  { id: 'prizes', label: '奖品清单' },
-  { id: 'speech', label: '主持词' }
+  { id: 'plan' },
+  { id: 'budget' },
+  { id: 'prizes' },
+  { id: 'speech' }
 ]
 const activeResultTab = ref('plan')
 
 const modeTabs = [
-  { id: 'chat', label: '自由对话' },
-  { id: 'form', label: '结构化表单' }
+  { id: 'chat' },
+  { id: 'form' }
 ]
 const activeMode = ref<'chat' | 'form'>('chat')
 
@@ -108,13 +108,13 @@ const saveToKnowledge = async (msgContent: string) => {
     // Determine a brief title from content
     const briefTitle = msgContent.substring(0, 20).replace(/\n/g, ' ') + '...'
     await knowledgeService.createKnowledge({
-      title: `对话记录: ${briefTitle}`,
+      title: t('planner.savedChatTitle', { title: briefTitle }),
       content: msgContent,
       category: 'PLANNER_CHAT'
     })
-    alert('已成功存入知识库！')
+    alert(t('planner.saveSuccess'))
   } catch (err: any) {
-    alert(`存入知识库失败: ${err.message}`)
+    alert(t('planner.saveError', { msg: err.message }))
   }
 }
 
@@ -148,7 +148,7 @@ const sendMessage = async () => {
   } catch (err: any) {
     messages.value.push({ 
       role: 'system', 
-      content: '❌ 请求失败: ' + (err.response?.data?.error?.message || err.message),
+      content: t('planner.requestError', { msg: err.response?.data?.error?.message || err.message }),
       isSystem: true
     })
   } finally {
@@ -161,7 +161,7 @@ const submitPlannerForm = async () => {
   const peopleCount = Number(plannerForm.value.peopleCount)
   const budget = Number(plannerForm.value.budget)
   if (!peopleCount || !budget || !plannerForm.value.date || !plannerForm.value.location) {
-    alert('请填写参与人数、预算、日期和地点')
+    alert(t('planner.form.requiredFields'))
     return
   }
 
@@ -189,7 +189,7 @@ const submitPlannerForm = async () => {
     activeMode.value = 'chat'
     scrollToBottom()
   } catch (err: any) {
-    alert(`生成方案失败: ${err.response?.data?.error?.message || err.message}`)
+    alert(t('planner.generateError', { msg: err.response?.data?.error?.message || err.message }))
   } finally {
     formLoading.value = false
   }
@@ -207,7 +207,7 @@ const handleFileUpload = async (e: Event) => {
     const parseRes = await parseService.parse({ file })
     const content = parseRes.data.content || parseRes.data.description
     
-    if (!content) throw new Error('无法提取文件内容')
+    if (!content) throw new Error(t('planner.extractContentError'))
     
     // 2. Save to knowledge base
     await knowledgeService.createKnowledge({ 
@@ -218,13 +218,13 @@ const handleFileUpload = async (e: Event) => {
     
     messages.value.push({
       role: 'system',
-      content: `✅ 成功将文档《${filename}》存入知识库。AI 将在后续策划中自动参考该文档。`,
+      content: t('planner.fileUploadSuccess', { filename }),
       isSystem: true
     })
   } catch (err: any) {
     messages.value.push({
       role: 'system',
-      content: `❌ 上传文档失败: ${err.message}`,
+      content: t('planner.fileUploadError', { msg: err.message }),
       isSystem: true
     })
   } finally {
@@ -240,11 +240,11 @@ const handleFileUpload = async (e: Event) => {
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
       <div class="label-micro delay-1 animate-slide-up" style="display: flex; justify-content: space-between; width: 100%;">
-        <span>AI ASSISTANT</span>
-        <button class="btn-text micro" @click="clearHistory">清空对话记录</button>
+        <span>{{ t('planner.kicker') }}</span>
+        <button class="btn-text micro" @click="clearHistory">{{ t('planner.clearHistory') }}</button>
       </div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('planner.title') }}</h1>
-      <p class="editorial-subtitle delay-3 animate-slide-up">Chat with AI to formulate comprehensive event strategies</p>
+      <p class="editorial-subtitle delay-3 animate-slide-up">{{ t('planner.subtitle') }}</p>
     </div>
 
     <div class="divider-y delay-4 animate-slide-up"></div>
@@ -257,7 +257,7 @@ const handleFileUpload = async (e: Event) => {
         :class="{ active: activeMode === tab.id }"
         @click="activeMode = tab.id as 'chat' | 'form'"
       >
-        {{ tab.label }}
+        {{ $t('planner.tabs.' + tab.id) }}
       </button>
     </div>
 
@@ -275,14 +275,14 @@ const handleFileUpload = async (e: Event) => {
           </div>
           <div v-else class="chat-bubble">
             <div class="bubble-header">
-              <span>{{ msg.role === 'user' ? 'YOU' : 'AI ASSISTANT' }}</span>
+              <span>{{ msg.role === 'user' ? t('planner.role.user') : t('planner.role.assistant') }}</span>
               <button 
                 v-if="msg.role === 'assistant'" 
                 class="btn-text micro" 
                 @click="saveToKnowledge(msg.content)"
-                title="存入策划知识库"
+                :title="t('planner.saveToKnowledgeTooltip')"
               >
-                存入知识库
+                {{ t('planner.saveToKnowledge') }}
               </button>
             </div>
             
@@ -296,7 +296,7 @@ const handleFileUpload = async (e: Event) => {
                   :class="{ active: activeResultTab === tab.id }"
                   @click="activeResultTab = tab.id"
                 >
-                  {{ tab.label }}
+                  {{ $t('planner.tabs.' + tab.id) }}
                 </button>
               </div>
               <div class="plan-block-content markdown-body" v-html="renderMarkdown(msg.parsedPlan[activeResultTab])"></div>
@@ -309,7 +309,7 @@ const handleFileUpload = async (e: Event) => {
         
         <div v-if="loading" class="chat-bubble-wrapper assistant">
           <div class="chat-bubble">
-            <div class="bubble-header">AI ASSISTANT</div>
+            <div class="bubble-header">{{ t('planner.role.assistant') }}</div>
             <div class="typing-indicator">
               <span></span><span></span><span></span>
             </div>
@@ -320,7 +320,7 @@ const handleFileUpload = async (e: Event) => {
       <!-- Chat Input -->
       <div v-if="activeMode === 'chat'" class="chat-input-area">
         <form @submit.prevent="sendMessage" class="chat-form">
-          <label class="upload-btn" :class="{ disabled: fileLoading }" title="上传参考文档至知识库">
+          <label class="upload-btn" :class="{ disabled: fileLoading }" :title="t('planner.uploadDocumentTooltip')">
             <input type="file" @change="handleFileUpload" accept=".txt,.pdf,.docx,.doc" :disabled="fileLoading" hidden />
             <span v-if="fileLoading" class="spinner-small"></span>
             <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
@@ -329,11 +329,11 @@ const handleFileUpload = async (e: Event) => {
             v-model="inputMessage" 
             type="text" 
             class="chat-input" 
-            placeholder="Message AI Assistant..." 
+            :placeholder="t('planner.inputPlaceholder')" 
             :disabled="loading"
           />
           <button type="submit" class="send-btn" :disabled="!inputMessage.trim() || loading">
-            SEND
+            {{ t('planner.send') }}
           </button>
         </form>
       </div>
@@ -343,54 +343,54 @@ const handleFileUpload = async (e: Event) => {
         <form @submit.prevent="submitPlannerForm" class="planner-form">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">参与人数 *</label>
+              <label class="form-label">{{ t('planner.form.peopleCount') }}</label>
               <input v-model.number="plannerForm.peopleCount" type="number" class="form-input" required min="1" />
             </div>
             <div class="form-group">
-              <label class="form-label">总预算（元） *</label>
+              <label class="form-label">{{ t('planner.form.budget') }}</label>
               <input v-model.number="plannerForm.budget" type="number" class="form-input" required min="0" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">日期 *</label>
+              <label class="form-label">{{ t('planner.form.date') }}</label>
               <input v-model="plannerForm.date" type="date" class="form-input" required />
             </div>
             <div class="form-group">
-              <label class="form-label">时长（小时）</label>
+              <label class="form-label">{{ t('planner.form.duration') }}</label>
               <input v-model.number="plannerForm.durationHours" type="number" class="form-input" min="0" step="0.5" />
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">地点/场地 *</label>
-            <input v-model="plannerForm.location" type="text" class="form-input" required placeholder="例如：室内球场 / 酒店宴会厅" />
+            <label class="form-label">{{ t('planner.form.location') }}</label>
+            <input v-model="plannerForm.location" type="text" class="form-input" required :placeholder="t('planner.form.locationPlaceholder')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">风格</label>
-            <input v-model="plannerForm.style" type="text" class="form-input" placeholder="例如：温馨 / 热烈 / 正式 / 轻松" />
+            <label class="form-label">{{ t('planner.form.style') }}</label>
+            <input v-model="plannerForm.style" type="text" class="form-input" :placeholder="t('planner.form.stylePlaceholder')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">必须包含的环节</label>
-            <textarea v-model="plannerForm.mustHave" class="form-textarea" rows="3" placeholder="用逗号或换行分隔，例如：颁奖，抽奖，合影"></textarea>
+            <label class="form-label">{{ t('planner.form.mustHave') }}</label>
+            <textarea v-model="plannerForm.mustHave" class="form-textarea" rows="3" :placeholder="t('planner.form.mustHavePlaceholder')"></textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">禁忌与避免事项</label>
-            <textarea v-model="plannerForm.avoid" class="form-textarea" rows="3" placeholder="用逗号或换行分隔"></textarea>
+            <label class="form-label">{{ t('planner.form.avoid') }}</label>
+            <textarea v-model="plannerForm.avoid" class="form-textarea" rows="3" :placeholder="t('planner.form.avoidPlaceholder')"></textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">其他补充</label>
+            <label class="form-label">{{ t('planner.form.notes') }}</label>
             <textarea v-model="plannerForm.notes" class="form-textarea" rows="3"></textarea>
           </div>
 
           <button type="submit" class="send-btn" :disabled="formLoading">
-            <span v-if="formLoading">生成中...</span>
-            <span v-else>生成年会方案</span>
+            <span v-if="formLoading">{{ t('planner.generating') }}</span>
+            <span v-else>{{ t('planner.generatePlan') }}</span>
           </button>
         </form>
       </div>

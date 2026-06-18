@@ -110,7 +110,7 @@ const canDeleteChronicle = (chronicle: any) => {
 }
 
 const handleDeleteMedia = async (mediaId: string) => {
-  if (confirm('确认删除这张照片吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteMedia'))) {
     try {
       await mediaService.deleteMedia(mediaId)
       if (data.value) {
@@ -118,13 +118,13 @@ const handleDeleteMedia = async (mediaId: string) => {
       }
       selectedMedia.value = null
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete media')
+      alert(err.response?.data?.error?.message || t('errors.deleteMediaFailed'))
     }
   }
 }
 
 const handleDeleteWork = async (work: Work) => {
-  if (confirm('确认删除该作品吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteWork'))) {
     try {
       await worksService.deleteWork(work.id)
       if (data.value) {
@@ -132,33 +132,33 @@ const handleDeleteWork = async (work: Work) => {
       }
       if (selectedWork.value?.id === work.id) selectedWork.value = null
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete work')
+      alert(err.response?.data?.error?.message || t('errors.deleteWorkFailed'))
     }
   }
 }
 
 const handleDeleteMatch = async (match: Match) => {
-  if (confirm('确认删除该比赛记录吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteMatch'))) {
     try {
       await matchesService.deleteMatch(match.id)
       if (data.value) {
         data.value.matches = data.value.matches.filter(m => m.id !== match.id)
       }
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete match')
+      alert(err.response?.data?.error?.message || t('errors.deleteMatchFailed'))
     }
   }
 }
 
 const handleDeleteChronicle = async (chronicle: any) => {
-  if (confirm('确认删除该纪事吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteChronicle'))) {
     try {
       await chroniclesService.deleteChronicle(chronicle.id)
       if (data.value && data.value.events) {
         data.value.events = data.value.events.filter(c => c.id !== chronicle.id)
       }
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete chronicle')
+      alert(err.response?.data?.error?.message || t('errors.deleteChronicleFailed'))
     }
   }
 }
@@ -287,7 +287,7 @@ const fetchData = async () => {
     const res = await yearsService.getYearAggregation(year.value)
     data.value = res.data
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to load year data'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.loadYearDataFailed')
   } finally {
     loading.value = false
     // Allow DOM to update then scroll to center the active year
@@ -316,11 +316,11 @@ watch(() => route.params.year, (newYear) => {
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
       <div class="label-micro delay-1 animate-slide-up">
-        <RouterLink to="/history" class="back-link">&larr; {{ t('app.menu.history') }} TIMELINE</RouterLink>
+        <RouterLink to="/history" class="back-link">&larr; {{ t('app.menu.history') }} {{ t('history.kicker') }}</RouterLink>
       </div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ year }}</h1>
       <p class="editorial-subtitle delay-3 animate-slide-up">
-        ARCHIVE COLLECTION
+        {{ t('history.archiveCollection') }}
       </p>
     </div>
 
@@ -352,7 +352,7 @@ watch(() => route.params.year, (newYear) => {
       <section class="year-content">
         <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
-          <span>Retrieving archives...</span>
+          <span>{{ t('history.loading') }}</span>
         </div>
 
         <div v-else-if="error" class="error-state">
@@ -363,7 +363,7 @@ watch(() => route.params.year, (newYear) => {
           
           <!-- Events/Chronicles Section -->
           <div class="archive-section" v-if="data.events && data.events.length > 0">
-            <h2 class="section-heading">&#x2014; 大事记</h2>
+            <h2 class="section-heading">{{ t('history.section.chronicles') }}</h2>
             <ChroniclesList 
               :chronicles="data.events" 
               :can-delete="canDeleteChronicle"
@@ -375,7 +375,7 @@ watch(() => route.params.year, (newYear) => {
 
           <!-- Media Section -->
           <div class="archive-section" v-if="data.media.length > 0">
-            <h2 class="section-heading" @click="router.push(`/media?year=${year}`)" style="cursor: pointer;">01 &mdash; {{ t('app.menu.media') }} <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">点击查看该年全部 ></span></h2>
+            <h2 class="section-heading" @click="router.push(`/media?year=${year}`)" style="cursor: pointer;">01 &mdash; {{ t('app.menu.media') }} <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">{{ t('history.viewAll') }}</span></h2>
             <MediaGallery 
               :media-list="data.media.slice(0, 10)" 
               group-by="month" 
@@ -388,7 +388,7 @@ watch(() => route.params.year, (newYear) => {
 
           <!-- Works Section -->
           <div class="archive-section" v-if="data.works.length > 0">
-            <h2 class="section-heading" @click="router.push(`/works?year=${year}`)" style="cursor: pointer;">02 &mdash; {{ t('app.menu.works') }} <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">点击查看该年全部 ></span></h2>
+            <h2 class="section-heading" @click="router.push(`/works?year=${year}`)" style="cursor: pointer;">02 &mdash; {{ t('app.menu.works') }} <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">{{ t('history.viewAll') }}</span></h2>
             <WorksGridModule 
               :works="data.works.slice(0, 3)" 
               group-by="month"
@@ -401,7 +401,7 @@ watch(() => route.params.year, (newYear) => {
 
           <!-- Matches Section -->
           <div class="archive-section" v-if="data.matches.length > 0">
-            <h2 class="section-heading">03 &mdash; {{ t('app.menu.matches') }}</h2>
+            <h2 class="section-heading">03 &mdash; {{ t('person.tabs.matches') }}</h2>
             <MatchesList 
               :matchesList="data.matches" 
               groupBy="month" 
@@ -412,8 +412,8 @@ watch(() => route.params.year, (newYear) => {
           </div>
 
           <div v-if="data.media.length === 0 && data.works.length === 0 && data.matches.length === 0 && (!data.events || data.events.length === 0)" class="empty-archive">
-            <p class="empty-text">No records found for {{ year }}.</p>
-            <button class="minimal-btn" @click="router.push('/upload')">CONTRIBUTE TO ARCHIVE</button>
+            <p class="empty-text">{{ t('history.noRecordsForYear', { year }) }}</p>
+            <button class="minimal-btn" @click="router.push('/upload')">{{ t('history.contribute') }}</button>
           </div>
 
         </div>
@@ -439,20 +439,20 @@ watch(() => route.params.year, (newYear) => {
           autoplay
           @dblclick="selectedMedia = null"
         ></video>
-        <div class="lightbox-hint">✌️ 双指缩放，双击关闭</div>
+        <div class="lightbox-hint">{{ t('media.lightboxHint') }}</div>
         <RouterLink
           v-if="selectedMedia"
           :to="`/media/${selectedMedia.id}`"
           class="lightbox-link"
-          title="打开独立页面"
+          :title="t('media.openDetailPage')"
           @click.stop
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
         </RouterLink>
         <div class="lightbox-info" v-if="selectedMedia">
-          <p v-if="selectedMedia.takenAt">{{ t('upload.media') }} Time: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
+          <p v-if="selectedMedia.takenAt">{{ t('media.timeLabel') }}: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
           <p v-if="selectedMedia.personTags && selectedMedia.personTags.length > 0">
-            Members: {{ selectedMedia.personTags.map((p: any) => p.displayName).join(', ') }}
+            {{ t('media.membersLabel') }}: {{ selectedMedia.personTags.map((p: any) => p.displayName).join(', ') }}
           </p>
         </div>
       </div>

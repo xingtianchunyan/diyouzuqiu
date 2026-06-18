@@ -39,7 +39,7 @@ const years = Array.from({ length: Math.max(2026, currentYear) - 2015 + 1 }, (_,
 
 const yearOptions = computed(() => {
   return [
-    { label: t('app.all'), value: '' },
+    { label: t('common.none'), value: '' },
     ...years.map(y => ({ label: String(y), value: y }))
   ]
 })
@@ -53,13 +53,13 @@ const canDeleteWork = (work: Work) => {
 }
 
 const handleDeleteWork = async (work: Work) => {
-  if (confirm('确认删除该作品吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteWork'))) {
     try {
       await worksService.deleteWork(work.id)
       worksStore.works = worksStore.works.filter(w => w.id !== work.id)
       if (selectedWork.value?.id === work.id) selectedWork.value = null
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete work')
+      alert(err.response?.data?.error?.message || t('errors.deleteWorkFailed'))
     }
   }
 }
@@ -113,7 +113,7 @@ onMounted(() => {
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">LIBRARY</div>
+      <div class="label-micro delay-1 animate-slide-up">{{ t('history.archiveCollection') }}</div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('app.menu.works') }}</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
         <p class="editorial-subtitle">{{ t('home.nav.worksDesc') }}</p>
@@ -125,8 +125,8 @@ onMounted(() => {
 
     <div class="filters-row delay-4 animate-slide-up">
       <div class="filter-group">
-        <label class="label-micro">YEAR</label>
-        <OrganicDropdown v-model="filterYear" :options="yearOptions" :placeholder="t('app.all')" />
+        <label class="label-micro">{{ t('works.year') }}</label>
+        <OrganicDropdown v-model="filterYear" :options="yearOptions" :placeholder="t('common.none')" />
       </div>
     </div>
 
@@ -141,7 +141,7 @@ onMounted(() => {
 
     <div v-if="worksStore.loading" class="loading-state delay-4 animate-slide-up">
       <div class="spinner"></div>
-      <span>Loading publications...</span>
+      <span>{{ t('common.loading') }}</span>
     </div>
 
     <div v-else-if="worksStore.error" class="error-state delay-4 animate-slide-up">

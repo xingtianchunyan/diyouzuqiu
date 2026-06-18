@@ -6,14 +6,14 @@
       @click="toggle"
     >
       <span class="dropdown-value">
-        {{ selectedLabel || placeholder }}
+        {{ selectedLabel || placeholder || $t('common.selectPlaceholder') }}
       </span>
       <div class="dropdown-actions">
         <button 
           v-if="modelValue && clearable" 
           class="clear-btn"
           @click.stop="clear"
-          aria-label="Clear selection"
+          :aria-label="$t('common.clearSelection')"
         >
           &times;
         </button>
@@ -32,7 +32,7 @@
         {{ option.label }}
       </div>
       <div v-if="options.length === 0" class="dropdown-empty">
-        No options
+        {{ $t('common.noOptions') }}
       </div>
     </div>
   </div>
@@ -52,7 +52,7 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   clearable?: boolean
 }>(), {
-  placeholder: 'Select...',
+  placeholder: undefined,
   clearable: true,
   modelValue: null
 })

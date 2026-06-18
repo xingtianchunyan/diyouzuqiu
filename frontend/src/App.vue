@@ -38,8 +38,8 @@ const mobileNavOptions = computed(() => {
     { label: t('app.menu.planner'), value: '/planner' },
   ]
   if (authStore.user?.role === 'ADMIN') {
-    opts.push({ label: '账号管理', value: '/admin/users' })
-    opts.push({ label: '知识库', value: '/knowledge' })
+    opts.push({ label: t('app.admin.accountManagement'), value: '/admin/users' })
+    opts.push({ label: t('app.admin.knowledgeBase'), value: '/knowledge' })
   }
   return opts
 })
@@ -81,8 +81,8 @@ const handleMobileNav = (val: string) => {
           <RouterLink class="nav-item" to="/people">{{ t('app.menu.people') }}</RouterLink>
           <RouterLink class="nav-item" to="/upload">{{ t('app.menu.upload') }}</RouterLink>
           <RouterLink class="nav-item" to="/planner">{{ t('app.menu.planner') }}</RouterLink>
-          <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/admin/users">账号管理</RouterLink>
-          <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/knowledge">知识库</RouterLink>
+          <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/admin/users">{{ t('app.admin.accountManagement') }}</RouterLink>
+          <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/knowledge">{{ t('app.admin.knowledgeBase') }}</RouterLink>
         </nav>
 
         <div class="header-actions">
@@ -95,7 +95,7 @@ const handleMobileNav = (val: string) => {
             />
           </div>
           <button class="lang-toggle" type="button" @click="toggleLocale">
-            {{ app.locale === 'zh-CN' ? 'EN' : '中' }}
+            {{ app.locale === 'zh-CN' ? t('app.langToggle.en') : t('app.langToggle.zh') }}
           </button>
         </div>
       </div>

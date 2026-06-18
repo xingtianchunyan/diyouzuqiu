@@ -1,8 +1,8 @@
 <template>
   <div class="daily-materials-panel" v-if="hasMaterials">
     <div class="panel-header">
-      <h4>当日已存在资料 ({{ date }})</h4>
-      <p class="panel-desc">勾选下方卡片即可自动关联到本次大事记，无需再次上传。</p>
+      <h4>{{ t('upload.dailyMaterials.title', { date }) }}</h4>
+      <p class="panel-desc">{{ t('upload.dailyMaterials.description') }}</p>
     </div>
 
     <div v-if="panelError" class="panel-error">{{ panelError }}</div>
@@ -28,8 +28,8 @@
           <img v-if="media.type === 'PHOTO'" :src="getMediaUrl(media.id)" class="card-img" />
           <video v-else-if="media.type === 'VIDEO'" :src="getMediaUrl(media.id)" class="card-img" preload="metadata"></video>
           <div class="card-meta">
-            <span class="tag">{{ media.type === 'PHOTO' ? '照片' : '视频' }}</span>
-            <span class="filename" :title="media.originalFilename">{{ media.originalFilename || '未命名' }}</span>
+            <span class="tag">{{ media.type === 'PHOTO' ? t('media.type.photo') : t('media.type.video') }}</span>
+            <span class="filename" :title="media.originalFilename">{{ media.originalFilename || t('common.unnamed') }}</span>
           </div>
         </div>
       </label>
@@ -52,7 +52,7 @@
         />
         <div class="card-content text-card">
           <div class="card-meta">
-            <span class="tag">{{ work.type === 'ARTICLE' ? '文章' : '诗集' }}</span>
+            <span class="tag">{{ work.type === 'ARTICLE' ? t('works.articles') : t('works.poems') }}</span>
           </div>
           <h5 class="title">{{ work.title }}</h5>
         </div>
@@ -63,7 +63,7 @@
         <input type="checkbox" :value="match.id" v-model="selectedMatches" class="card-checkbox" />
         <div class="card-content text-card">
           <div class="card-meta">
-            <span class="tag">比赛记录</span>
+            <span class="tag">{{ t('matches.record') }}</span>
           </div>
           <h5 class="title">{{ match.title }}</h5>
           <div class="score">{{ match.redScore }} : {{ match.blueScore }}</div>
@@ -75,8 +75,11 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { chroniclesService } from '../api/services/chronicles.service'
 import { mediaService } from '../api/services/media.service'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   date: string
@@ -134,7 +137,7 @@ watch(() => props.date, (newDate) => {
       selectedPoems.value = selectedPoems.value.filter(id => res.data.works.some(w => w.id === id && w.type === 'POEM'))
       selectedMatches.value = selectedMatches.value.filter(id => res.data.matches.some(m => m.id === id))
     } catch (err: any) {
-      panelError.value = err.response?.data?.error?.message || err.message || 'Failed to load daily materials'
+      panelError.value = err.response?.data?.error?.message || err.message || t('errors.loadDailyMaterialsFailed')
     } finally {
       loading.value = false
     }

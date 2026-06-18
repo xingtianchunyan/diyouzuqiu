@@ -15,7 +15,11 @@ describe('Knowledge API', () => {
   })
 
   it('GET /api/v1/knowledge returns list', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/v1/knowledge' })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/knowledge',
+      headers: { authorization: `Bearer ${token}` }
+    })
     expect(res.statusCode).toBe(200)
     expect(Array.isArray(res.json())).toBe(true)
   })
@@ -37,7 +41,8 @@ describe('Knowledge API', () => {
   it('GET /api/v1/knowledge?q=useful filters docs', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/v1/knowledge?q=useful'
+      url: '/api/v1/knowledge?q=useful',
+      headers: { authorization: `Bearer ${token}` }
     })
     expect(res.statusCode).toBe(200)
     const docs = res.json()

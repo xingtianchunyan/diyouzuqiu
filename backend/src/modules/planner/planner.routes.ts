@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import { callQwenChat, ChatMessage } from './qwen.client.js'
 import { extractJsonObjectFromText, JsonExtractionError, validateAnnualPlan } from '../../lib/ai/json.js'
+import { validateBody, z } from '../../lib/validate.js'
 
 /**
  * RAG 检索抽象函数
@@ -93,13 +94,42 @@ interface PlannerConstraints {
   notes?: string
 }
 
-export const plannerRoutes: FastifyPluginAsync = async (app) => {
-  app.post('/planner/annual', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { constraints } = request.body as { constraints: PlannerConstraints }
+const annualPlanSchema = z.object({
+  constraints: z.object({
+    peopleCount: z.number().int().min(1).max(100_000),
+    budget: z.number().int().min(0).max(1_000_000_000),
+    date: z.string().max(100),
+    location: z.string().min(1).max(200),
+    durationHours: z.number().int().min(1).max(168).optional(),
+    style: z.string().max(200).optional(),
+    mustHave: z.array(z.string().max(200)).max(50).optional(),
+    avoid: z.array(z.string().max(200)).max(50).optional(),
+    notes: z.string().max(2000).optional()
+  })
+})
 
-    if (!constraints || !constraints.peopleCount || !constraints.budget || !constraints.date || !constraints.location) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Missing required constraints' } })
+const chatMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string().max(5000)
+})
+
+const plannerChatSchema = z.object({
+  messages: z.array(chatMessageSchema).min(1).max(20),
+  plannerProjectId: z.string().optional()
+})
+
+export const plannerRoutes: FastifyPluginAsync = async (app) => {
+  app.post('/planner/annual', {
+    preValidation: [app.authenticate, validateBody(annualPlanSchema)],
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute'
+      },
+      skipXssEscape: true
     }
+  }, async (request, reply) => {
+    const { constraints } = (request as any).validatedBody as { constraints: PlannerConstraints }
 
     // Build query for RAG
     const keywords = ['年会', '流程', '预算', '主持词', '奖项', '游戏', constraints.location, constraints.style || '']
@@ -163,16 +193,21 @@ ${docs.map((d: any) => `[引用文档 ${d.title}]\n${d.content}`).join('\n\n')}
         return reply.code(500).send({ error: { code: error.code, message: error.message } })
       }
       request.log.error(error)
-      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to generate plan from Qwen API: ' + error.message } })
+      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to generate plan from Qwen API' } })
     }
   })
 
-  app.post('/planner/chat', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { messages, plannerProjectId } = request.body as { messages: ChatMessage[]; plannerProjectId?: string }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Missing or invalid messages array' } })
+  app.post('/planner/chat', {
+    preValidation: [app.authenticate, validateBody(plannerChatSchema)],
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '1 minute'
+      },
+      skipXssEscape: true
     }
+  }, async (request, reply) => {
+    const { messages, plannerProjectId } = (request as any).validatedBody as { messages: ChatMessage[]; plannerProjectId?: string }
 
     const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content || ''
 
@@ -233,7 +268,7 @@ ${docs.map((d: any) => `[引用文档 ${d.title}]\n${d.content.substring(0, 1000
       return { response }
     } catch (error: any) {
       request.log.error(error)
-      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to chat with Qwen API: ' + error.message } })
+      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to chat with Qwen API' } })
     }
   })
 }

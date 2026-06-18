@@ -18,8 +18,7 @@ const updateMemberSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   team: z.enum(['RED', 'BLUE']).optional().nullable(),
   familyId: z.string().optional().nullable(),
-  isCaptain: z.boolean().optional(),
-  avatarUrl: z.string().optional().nullable()
+  isCaptain: z.boolean().optional()
 })
 
 export const membersRoutes: FastifyPluginAsync = async (app) => {
@@ -99,29 +98,27 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       }
     } catch (e: any) {
       console.error('Error fetching member:', e)
-      return reply.code(500).send({ error: e.message })
+      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch member' } })
     }
   })
 
   // PUT /members/:id
   app.put('/members/:id', { preValidation: [app.authenticate, validateBody(updateMemberSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { displayName, team, familyId, isCaptain, avatarUrl } = (request as any).validatedBody
+    const { displayName, team, familyId, isCaptain } = (request as any).validatedBody
     const user = request.user
 
     const data: any = {}
-    
+
     if (user.role === 'ADMIN') {
       if (displayName !== undefined) data.displayName = displayName
       if (team !== undefined) data.team = team || null
       if (familyId !== undefined) data.familyId = familyId || null
       if (isCaptain !== undefined) data.isCaptain = isCaptain
-      if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null
     } else {
       if (user.memberId !== id) {
         return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You can only edit your own profile' } })
       }
-      if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null
       if (displayName !== undefined) data.displayName = displayName
     }
 
@@ -151,7 +148,13 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'No file uploaded' } })
     }
 
-    const { avatarUrl } = await saveAvatarFile(file, id)
+    let avatarUrl: string
+    try {
+      const result = await saveAvatarFile(file, id)
+      avatarUrl = result.avatarUrl
+    } catch (err: any) {
+      return reply.code(400).send({ error: { code: 'INVALID_AVATAR', message: err.message || 'Failed to process avatar' } })
+    }
 
     const member = await prisma.member.update({
       where: { id },

@@ -15,14 +15,19 @@ describe('Chronicles API', () => {
   })
 
   it('GET /api/v1/daily-materials requires date', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/v1/daily-materials' })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/daily-materials',
+      headers: { authorization: `Bearer ${token}` }
+    })
     expect(res.statusCode).toBe(400)
   })
 
   it('GET /api/v1/daily-materials returns daily data', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/v1/daily-materials?date=2024-12-01'
+      url: '/api/v1/daily-materials?date=2024-12-01',
+      headers: { authorization: `Bearer ${token}` }
     })
     expect(res.statusCode).toBe(200)
     const body = res.json()
@@ -49,7 +54,8 @@ describe('Chronicles API', () => {
   it('GET /api/v1/chronicles returns list', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/v1/chronicles?year=2024'
+      url: '/api/v1/chronicles?year=2024',
+      headers: { authorization: `Bearer ${token}` }
     })
     expect(res.statusCode).toBe(200)
     expect(Array.isArray(res.json())).toBe(true)

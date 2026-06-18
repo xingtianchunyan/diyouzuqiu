@@ -1,4 +1,5 @@
 import { apiClient } from '../client'
+import { i18n } from '../../i18n'
 
 export interface ParsedData {
   title: string
@@ -24,6 +25,6 @@ export const parseService = {
       if (data.targetType) payload.targetType = data.targetType
       return apiClient.post<ParsedData>('/parse', payload)
     }
-    throw new Error('Either file, url or html must be provided')
+    throw new Error(i18n.global.t('errors.parseInputRequired'))
   }
 }

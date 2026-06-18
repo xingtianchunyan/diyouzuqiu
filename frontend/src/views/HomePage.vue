@@ -25,7 +25,7 @@ const navItems = [
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">DIYOU ARCHIVE &bull; EST. 2013</div>
+      <div class="label-micro delay-1 animate-slide-up">{{ t('home.kicker') }}</div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('home.title') }}</h1>
       <p class="editorial-subtitle delay-3 animate-slide-up">{{ t('home.subtitle') }}</p>
 

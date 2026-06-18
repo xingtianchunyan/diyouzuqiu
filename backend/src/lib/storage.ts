@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { pipeline } from 'stream/promises'
+import sharp from 'sharp'
 import type { MultipartFile } from '@fastify/multipart'
 
 // Base storage directory
@@ -80,43 +81,62 @@ export async function saveMediaFile(
   }
 }
 
+const ALLOWED_AVATAR_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+const AVATAR_MAX_DIMENSION = 4096
+const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024
+
 export async function saveAvatarFile(
   file: MultipartFile,
   memberId: string
 ): Promise<{ avatarUrl: string }> {
-  const tempDir = path.join(STORAGE_ROOT, 'temp')
-  await ensureDir(tempDir)
-
-  const tempFilePath = path.join(tempDir, `avatar_${memberId}_temp`)
-  
-  const writeStream = fs.createWriteStream(tempFilePath)
-  for await (const chunk of file.file) {
-    writeStream.write(chunk)
+  const ext = path.extname(file.filename).toLowerCase()
+  if (!ALLOWED_AVATAR_EXTS.includes(ext)) {
+    throw new Error('Invalid avatar file type')
   }
-  writeStream.end()
 
-  await new Promise<void>((resolve, reject) => {
-    writeStream.on('finish', () => resolve())
-    writeStream.on('error', reject)
-  })
+  const chunks: Buffer[] = []
+  let sizeBytes = 0
+  for await (const chunk of file.file) {
+    sizeBytes += chunk.length
+    if (sizeBytes > AVATAR_MAX_SIZE_BYTES) {
+      throw new Error('Avatar file too large')
+    }
+    chunks.push(chunk)
+  }
+  const buffer = Buffer.concat(chunks)
 
-  const ext = path.extname(file.filename) || '.jpg'
-  // append timestamp to bypass browser cache
-  const timestamp = Date.now()
-  const finalFilename = `${memberId}_${timestamp}${ext}`
+  // Use sharp to validate and re-encode the image. This destroys any
+  // embedded scripts / polyglots and normalizes the output format.
+  let processed: Buffer
+  try {
+    const metadata = await sharp(buffer).metadata()
+    if (!metadata.width || !metadata.height) {
+      throw new Error('Invalid image')
+    }
+    if (metadata.width > AVATAR_MAX_DIMENSION || metadata.height > AVATAR_MAX_DIMENSION) {
+      throw new Error(`Avatar dimensions must not exceed ${AVATAR_MAX_DIMENSION}x${AVATAR_MAX_DIMENSION}`)
+    }
+
+    processed = await sharp(buffer, { animated: metadata.pages ? true : false })
+      .rotate() // honor EXIF orientation
+      .webp({ quality: 85 })
+      .toBuffer()
+  } catch (err: any) {
+    throw new Error('Failed to process avatar image: ' + (err.message || 'unknown error'))
+  }
+
   const relativeDir = 'avatars'
   const finalDir = path.join(STORAGE_ROOT, relativeDir)
-
   await ensureDir(finalDir)
 
+  const timestamp = Date.now()
+  const finalFilename = `${memberId}_${timestamp}.webp`
   const relativeStoragePath = path.join(relativeDir, finalFilename)
   const finalFilePath = path.join(STORAGE_ROOT, relativeStoragePath)
 
-  await fs.promises.rename(tempFilePath, finalFilePath)
+  await fs.promises.writeFile(finalFilePath, processed)
 
-  // Assuming /static-storage/ is mounted in main.ts
   const url = `/static-storage/${relativeStoragePath.replace(/\\/g, '/')}`
-  
   return { avatarUrl: url }
 }
 

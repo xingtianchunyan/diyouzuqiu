@@ -1,12 +1,9 @@
 import type { FastifyPluginAsync, FastifyBaseLogger } from 'fastify'
-import pdfParseModule from 'pdf-parse-new'
-import * as mammoth from 'mammoth'
 import * as cheerio from 'cheerio'
 import { JSDOM } from 'jsdom'
 import { Readability } from '@mozilla/readability'
-
-
-const pdfParse = pdfParseModule as any
+import { isAllowedUrl } from '../../lib/url.js'
+import { parseDocument } from '../../lib/documentParser.js'
 
 function normalizeToYmd(dateValue: string): string | null {
   const trimmed = (dateValue || '').trim()
@@ -308,7 +305,18 @@ function parseWeChatArticle(html: string, pageUrl: string) {
   return { title, content, date, author, description, isWeChat: true }
 }
 
-async function fetchHtml(url: string, log: FastifyBaseLogger) {
+const MAX_REDIRECTS = 5
+
+async function fetchHtml(url: string, log: FastifyBaseLogger, redirectCount = 0): Promise<string> {
+  if (redirectCount > MAX_REDIRECTS) {
+    throw new Error('Too many redirects')
+  }
+
+  const allowed = await isAllowedUrl(url)
+  if (!allowed) {
+    throw new Error('URL is not allowed')
+  }
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 20000)
 
@@ -321,9 +329,18 @@ async function fetchHtml(url: string, log: FastifyBaseLogger) {
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         ...(isWeChat ? { Referer: 'https://mp.weixin.qq.com/' } : {})
       },
-      redirect: 'follow',
+      redirect: 'manual',
       signal: controller.signal
     })
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      if (!location) {
+        throw new Error('Redirect without Location header')
+      }
+      const nextUrl = new URL(location, url).href
+      return fetchHtml(nextUrl, log, redirectCount + 1)
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status} ${response.statusText || ''}`.trim())
@@ -409,12 +426,16 @@ function parseHtml(html: string, url?: string) {
 }
 
 export const parseRoutes: FastifyPluginAsync = async (app) => {
-  app.get('/parse', async (request, reply) => {
+  app.get('/parse', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { url, targetType: rawTargetType } = request.query as { url?: string; targetType?: string }
     const targetType = rawTargetType || ''
 
     if (!url) {
       return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'URL is required' } })
+    }
+
+    if (!(await isAllowedUrl(url))) {
+      return reply.code(400).send({ error: { code: 'INVALID_URL', message: 'URL is not allowed' } })
     }
 
     let html = ''
@@ -425,7 +446,8 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
       if (err?.name === 'AbortError') {
         return reply.code(504).send({ error: { code: 'FETCH_TIMEOUT', message: 'URL fetch timeout' } })
       }
-      return reply.code(500).send({ error: { code: 'FETCH_ERROR', message: err?.message || 'Failed to fetch or parse URL' } })
+      const message = err?.message === 'URL is not allowed' ? 'URL is not allowed' : 'Failed to fetch or parse URL'
+      return reply.code(err?.message === 'URL is not allowed' ? 400 : 500).send({ error: { code: err?.message === 'URL is not allowed' ? 'INVALID_URL' : 'FETCH_ERROR', message } })
     }
 
     const parsed = parseHtml(html, url)
@@ -439,7 +461,7 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.post('/parse', async (request, reply) => {
+  app.post('/parse', { preValidation: [app.authenticate] }, async (request, reply) => {
     let title = ''
     let content = ''
     let date = ''
@@ -457,9 +479,6 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
       }
 
       if (data?.filename) {
-        const filename = data.filename.toLowerCase()
-        title = data.filename.split('.').slice(0, -1).join('.') || data.filename
-
         const chunks = []
         for await (const chunk of data.file) {
           chunks.push(chunk)
@@ -467,18 +486,12 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
         const buffer = Buffer.concat(chunks)
 
         try {
-          if (filename.endsWith('.pdf')) {
-            const pdfData = await pdfParse(buffer)
-            content = pdfData.text
-          } else if (filename.endsWith('.docx')) {
-            const result = await mammoth.extractRawText({ buffer })
-            content = result.value
-          } else {
-            content = buffer.toString('utf-8')
-          }
+          const parsed = await parseDocument(buffer, data.filename)
+          title = parsed.title
+          content = parsed.content
         } catch (err: any) {
           app.log.error(err)
-          return reply.code(500).send({ error: { code: 'PARSE_ERROR', message: err?.message || 'Failed to parse file' } })
+          return reply.code(500).send({ error: { code: 'PARSE_ERROR', message: 'Failed to parse file' } })
         }
       } else {
         return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'No file uploaded' } })
@@ -489,6 +502,9 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
 
       if (body?.url) {
         sourceUrl = body.url
+        if (!(await isAllowedUrl(body.url))) {
+          return reply.code(400).send({ error: { code: 'INVALID_URL', message: 'URL is not allowed' } })
+        }
         try {
           const html = await fetchHtml(body.url, app.log)
           const parsed = parseHtml(html, body.url)
@@ -502,7 +518,9 @@ export const parseRoutes: FastifyPluginAsync = async (app) => {
           if (err?.name === 'AbortError') {
             return reply.code(504).send({ error: { code: 'FETCH_TIMEOUT', message: 'URL fetch timeout' } })
           }
-          return reply.code(500).send({ error: { code: 'FETCH_ERROR', message: err?.message || 'Failed to fetch or parse URL' } })
+          const isDisallowed = err?.message === 'URL is not allowed'
+          const message = isDisallowed ? 'URL is not allowed' : 'Failed to fetch or parse URL'
+          return reply.code(isDisallowed ? 400 : 500).send({ error: { code: isDisallowed ? 'INVALID_URL' : 'FETCH_ERROR', message } })
         }
       } else if (typeof body?.html === 'string') {
         const parsed = parseHtml(body.html)

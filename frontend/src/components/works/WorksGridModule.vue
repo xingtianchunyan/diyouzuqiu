@@ -29,12 +29,12 @@ const getGroupKey = (work: Work) => {
   if (props.groupBy === 'year') {
     if (work.year) return String(work.year)
     if (basis) return basis.substring(0, 4)
-    return 'Unknown'
+    return t('common.unknown')
   }
 
   if (basis) return basis.substring(0, 7)
   if (work.year) return `${work.year}-01`
-  return 'Unknown'
+  return t('common.unknown')
 }
 
 const getMetaDate = (work: Work) => {
@@ -63,15 +63,15 @@ const groupedWorks = computed(() => {
 })
 
 const getTypeLabel = (work: Work) => {
-  if (work.type === 'ARTICLE') return t('works.articles', 'Article')
-  return t('works.poems', 'Poem')
+  if (work.type === 'ARTICLE') return t('works.articles')
+  return t('works.poems')
 }
 
 </script>
 
 <template>
   <div v-if="groupedWorks.length === 0" class="empty-archive">
-    <p class="empty-text">{{ t('works.noWorks', 'No works found matching your criteria.') }}</p>
+    <p class="empty-text">{{ t('works.noWorks') }}</p>
   </div>
 
   <div v-else class="works-grid-module">
@@ -92,14 +92,14 @@ const getTypeLabel = (work: Work) => {
               <button 
                 class="edit-btn"
                 @click.stop="emit('edit', work)"
-                title="Edit"
+                :title="t('common.edit')"
               >
                 ✎
               </button>
               <button 
                 class="delete-btn"
                 @click.stop="emit('delete', work)"
-                title="Delete"
+                :title="t('common.delete')"
               >
                 ×
               </button>

@@ -5,6 +5,7 @@ import { apiClient } from '../api/client'
 export interface User {
   id: string
   email: string
+  phone?: string | null
   role: 'ADMIN' | 'MEMBER'
   memberId: string | null
 }

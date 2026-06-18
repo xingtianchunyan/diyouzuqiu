@@ -12,21 +12,21 @@ const workQuerySchema = z.object({
 const createWorkSchema = z.object({
   type: z.enum(['ARTICLE', 'POEM']),
   title: z.string().min(1).max(500),
-  content: z.string().min(1),
+  content: z.string().min(1).max(100_000),
   authorId: z.string().optional(),
   authorName: z.string().max(200).optional(),
   year: z.number().int().optional(),
-  date: z.string().optional()
+  date: z.string().date().optional()
 })
 
 const updateWorkSchema = z.object({
   type: z.enum(['ARTICLE', 'POEM']).optional(),
   title: z.string().min(1).max(500).optional(),
-  content: z.string().min(1).optional(),
+  content: z.string().min(1).max(100_000).optional(),
   authorId: z.string().optional(),
   authorName: z.string().max(200).optional(),
   year: z.number().int().optional(),
-  date: z.string().optional()
+  date: z.string().date().optional()
 })
 
 export const worksRoutes: FastifyPluginAsync = async (app) => {
@@ -117,7 +117,7 @@ export const worksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // GET /works/:id
-  app.get('/works/:id', async (request, reply) => {
+  app.get('/works/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const work = await prisma.work.findUnique({
       where: { id },

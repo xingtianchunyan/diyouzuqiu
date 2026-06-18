@@ -24,18 +24,18 @@ const familyById = computed(() => {
 })
 
 const familyOptions = computed(() => [
-  { label: t('people.allFamilies') || 'All Families', value: '' },
+  { label: t('people.allFamilies'), value: '' },
   ...familiesStore.families.map(f => ({ label: f.label, value: f.id }))
 ])
 
 const redTeamOptions = computed(() => [
-  { label: t('people.allRed') || 'All Red', value: '' },
-  { label: t('people.red') || 'Red Team', value: 'RED' }
+  { label: t('people.allRed'), value: '' },
+  { label: t('people.red'), value: 'RED' }
 ])
 
 const blueTeamOptions = computed(() => [
-  { label: t('people.allBlue') || 'All Blue', value: '' },
-  { label: t('people.blue') || 'Blue Team', value: 'BLUE' }
+  { label: t('people.allBlue'), value: '' },
+  { label: t('people.blue'), value: 'BLUE' }
 ])
 
 const activeTeam = computed(() => {
@@ -86,27 +86,27 @@ onMounted(() => {
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">ROSTER</div>
-      <h1 class="editorial-title delay-2 animate-slide-up">{{ t('app.menu.people') }}</h1>
+      <div class="label-micro delay-1 animate-slide-up">{{ $t('people.roster') }}</div>
+      <h1 class="editorial-title delay-2 animate-slide-up">{{ $t('app.menu.people') }}</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
-        <p class="editorial-subtitle">{{ t('home.nav.peopleDesc') }}</p>
+        <p class="editorial-subtitle">{{ $t('home.nav.peopleDesc') }}</p>
         <button class="action-btn" @click="router.push('/upload?tab=MEMBER')">
-          + {{ t('app.menu.upload') }}
+          + {{ $t('app.menu.upload') }}
         </button>
       </div>
     </div>
 
     <div class="filters-row delay-4 animate-slide-up">
       <div class="filter-group">
-        <label class="label-micro">{{ t('people.family') || 'FAMILY' }}</label>
+        <label class="label-micro">{{ $t('people.family') }}</label>
         <OrganicDropdown v-model="selectedFamily" :options="familyOptions" @change="onFamilyChange" />
       </div>
       <div class="filter-group">
-        <label class="label-micro">{{ t('people.red') || 'RED TEAM' }}</label>
+        <label class="label-micro">{{ $t('people.red') }}</label>
         <OrganicDropdown v-model="selectedRedTeam" :options="redTeamOptions" @change="onRedTeamChange" />
       </div>
       <div class="filter-group">
-        <label class="label-micro">{{ t('people.blue') || 'BLUE TEAM' }}</label>
+        <label class="label-micro">{{ $t('people.blue') }}</label>
         <OrganicDropdown v-model="selectedBlueTeam" :options="blueTeamOptions" @change="onBlueTeamChange" />
       </div>
     </div>
@@ -115,7 +115,7 @@ onMounted(() => {
 
     <div v-if="membersStore.loading" class="loading-state delay-4 animate-slide-up">
       <div class="spinner"></div>
-      <span>Loading roster...</span>
+      <span>{{ $t('people.loading') }}</span>
     </div>
 
     <div v-else-if="membersStore.error" class="error-state delay-4 animate-slide-up">
@@ -123,7 +123,7 @@ onMounted(() => {
     </div>
 
     <div v-else-if="membersStore.members.length === 0" class="empty-archive delay-4 animate-slide-up">
-      <p class="empty-text">No members found matching your criteria.</p>
+      <p class="empty-text">{{ $t('people.noMembers') }}</p>
     </div>
 
     <div v-else class="members-grid delay-4 animate-slide-up">
@@ -145,7 +145,7 @@ onMounted(() => {
         <div class="member-info">
           <h3 class="member-name">
             {{ member.displayName }}
-            <span v-if="member.isCaptain" class="captain-badge" title="队长">👑</span>
+            <span v-if="member.isCaptain" class="captain-badge" :title="$t('people.captain')">👑</span>
           </h3>
           <div class="member-tags">
             <span v-if="member.familyId && familyById[member.familyId]" class="tag family">

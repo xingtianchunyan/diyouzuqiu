@@ -16,7 +16,7 @@
       >
         <div class="s-node-content">
           <span class="s-node-year">{{ node.year }}</span>
-          <span class="s-node-action">EXPLORE</span>
+          <span class="s-node-action">{{ $t('history.explore') }}</span>
         </div>
         <div class="s-node-point">
           <div class="s-node-dot"></div>

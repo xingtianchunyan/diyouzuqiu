@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { buildApp } from '../src/app.js'
 import type { FastifyInstance } from 'fastify'
+import { loginAsAdmin } from './helpers.js'
 
 describe('Parse API', () => {
   let app: FastifyInstance
+  let token: string
 
   beforeAll(async () => {
     app = await buildApp()
+    const auth = await loginAsAdmin(app)
+    token = auth.token
   })
 
   it('POST /api/v1/parse extracts WeChat article metadata', async () => {
@@ -27,7 +31,7 @@ describe('Parse API', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/parse',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       payload: { html }
     })
     expect(res.statusCode).toBe(200)
@@ -43,9 +47,20 @@ describe('Parse API', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/parse',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       payload: {}
     })
     expect(res.statusCode).toBe(400)
+  })
+
+  it('POST /api/v1/parse rejects SSRF to cloud metadata', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/parse',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      payload: { url: 'http://169.254.169.254/latest/meta-data/' }
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error.code).toBe('INVALID_URL')
   })
 })

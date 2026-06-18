@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Media } from '../../api/services/media.service'
 import type { Work } from '../../api/services/works.service'
 import type { Match } from '../../api/services/matches.service'
@@ -25,6 +26,8 @@ export interface ChronicleEvent {
   createdByUserId?: string
 }
 
+const { t, locale } = useI18n()
+
 const props = defineProps<{
   chronicles: ChronicleEvent[]
   canDelete?: (item: ChronicleEvent) => boolean
@@ -48,7 +51,7 @@ const sortedChronicles = computed(() => {
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr)
   return {
-    month: d.toLocaleString('en-US', { month: 'short' }),
+    month: d.toLocaleString(locale.value, { month: 'short' }),
     day: d.getDate().toString().padStart(2, '0'),
     year: d.getFullYear()
   }
@@ -69,7 +72,7 @@ const getMonthKey = (dateStr: string | null | undefined, fallbackYear?: number |
     }
   }
   if (fallbackYear) return `${fallbackYear}-01`
-  return 'Unknown Date'
+  return t('common.unknownDate')
 }
 
 const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup[] => {
@@ -111,7 +114,7 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
 <template>
   <div class="chronicles-list-container">
     <div v-if="chronicles.length === 0" class="empty-archive">
-      <p class="empty-text">No chronicle events found.</p>
+      <p class="empty-text">{{ $t('chronicles.noRecords') }}</p>
     </div>
     
     <div v-else class="timeline">
@@ -131,15 +134,15 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
           <div class="chronicle-header">
             <h3 class="chronicle-title">{{ chronicle.title }}</h3>
             <div v-if="props.canDelete && props.canDelete(chronicle)" class="chronicle-actions">
-              <button 
+              <button
                 class="edit-btn"
                 @click="emit('edit', chronicle)"
-                title="Edit"
+                :title="$t('common.edit')"
               >✎</button>
-              <button 
+              <button
                 class="delete-btn"
                 @click="emit('delete', chronicle)"
-                title="Delete"
+                :title="$t('common.delete')"
               >×</button>
             </div>
           </div>
@@ -148,7 +151,7 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
             <img 
               v-if="chronicle.primaryMedia.type === 'PHOTO'" 
               :src="getMediaUrl(chronicle.primaryMedia.id)" 
-              alt="Chronicle Cover" 
+              :alt="$t('chronicles.coverAlt')" 
               class="media-img"
               loading="lazy"
             />
@@ -179,7 +182,7 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
               <MonthGroupHeading :label="group.label" />
 
               <div v-if="group.media.length > 0" class="related-block">
-                <div class="related-label">MEDIA</div>
+                <div class="related-label">{{ $t('chronicles.related.media') }}</div>
                 <MediaGallery
                   :media-list="group.media"
                   group-by="month"
@@ -189,7 +192,7 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
               </div>
 
               <div v-if="group.works.length > 0" class="related-block">
-                <div class="related-label">WORKS</div>
+                <div class="related-label">{{ $t('chronicles.related.works') }}</div>
                 <WorksGridModule
                   :works="group.works"
                   group-by="month"
@@ -199,7 +202,7 @@ const getChronicleRelatedGroups = (chronicle: ChronicleEvent): RelatedMonthGroup
               </div>
 
               <div v-if="group.matches.length > 0" class="related-block">
-                <div class="related-label">MATCHES</div>
+                <div class="related-label">{{ $t('chronicles.related.matches') }}</div>
                 <MatchesList :matches-list="group.matches" group-by="none" />
               </div>
             </section>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -12,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()
+
+const { t } = useI18n()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const mode = ref<'edit' | 'split' | 'preview'>('split')
@@ -148,7 +151,7 @@ const insertCodeBlock = () => {
 
 const insertLink = () => {
   const { text } = getSelection()
-  const label = text || '链接文字'
+  const label = text || t('editor.linkText')
   const link = `[${label}](https://)`
   const { start, end } = getSelection()
   replaceRange(start, end, link)
@@ -156,7 +159,7 @@ const insertLink = () => {
 }
 
 const insertImage = () => {
-  insertAtCursor('\n\n![图片描述](https://)\n\n')
+  insertAtCursor(`\n\n![${t('editor.imageAlt')}](https://)\n\n`)
 }
 
 const insertHorizontalRule = () => {
@@ -169,9 +172,9 @@ const handleToolbar = (action: string) => {
     case 'h1': insertHeading(1); break
     case 'h2': insertHeading(2); break
     case 'h3': insertHeading(3); break
-    case 'bold': wrapSelection('**', '**', '粗体文字'); break
-    case 'italic': wrapSelection('*', '*', '斜体文字'); break
-    case 'strike': wrapSelection('~~', '~~', '删除线'); break
+    case 'bold': wrapSelection('**', '**', t('editor.boldText')); break
+    case 'italic': wrapSelection('*', '*', t('editor.italicText')); break
+    case 'strike': wrapSelection('~~', '~~', t('editor.strikeText')); break
     case 'quote': insertQuote(); break
     case 'ul': insertList(false); break
     case 'ol': insertList(true); break
@@ -221,34 +224,34 @@ const handleKeydown = (e: KeyboardEvent) => {
   <div class="markdown-editor">
     <div class="editor-toolbar">
       <div class="toolbar-group">
-        <button type="button" class="tool-btn" @click="handleToolbar('h1')" title="标题 1">H1</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('h2')" title="标题 2">H2</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('h3')" title="标题 3">H3</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('h1')" :title="$t('editor.toolbar.heading1')">H1</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('h2')" :title="$t('editor.toolbar.heading2')">H2</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('h3')" :title="$t('editor.toolbar.heading3')">H3</button>
       </div>
       <div class="toolbar-divider"></div>
       <div class="toolbar-group">
-        <button type="button" class="tool-btn" @click="handleToolbar('bold')" title="粗体 (Ctrl+B)"><b>B</b></button>
-        <button type="button" class="tool-btn" @click="handleToolbar('italic')" title="斜体 (Ctrl+I)"><i>I</i></button>
-        <button type="button" class="tool-btn" @click="handleToolbar('strike')" title="删除线"><s>S</s></button>
+        <button type="button" class="tool-btn" @click="handleToolbar('bold')" :title="$t('editor.toolbar.bold')"><b>B</b></button>
+        <button type="button" class="tool-btn" @click="handleToolbar('italic')" :title="$t('editor.toolbar.italic')"><i>I</i></button>
+        <button type="button" class="tool-btn" @click="handleToolbar('strike')" :title="$t('editor.toolbar.strike')"><s>S</s></button>
       </div>
       <div class="toolbar-divider"></div>
       <div class="toolbar-group">
-        <button type="button" class="tool-btn" @click="handleToolbar('quote')" title="引用 (Ctrl+Shift+9)">”</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('ul')" title="无序列表 (Ctrl+Shift+8)">☰</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('ol')" title="有序列表 (Ctrl+Shift+7)">1.</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('code')" title="代码">&lt;/&gt;</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('quote')" :title="$t('editor.toolbar.quote')">”</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('ul')" :title="$t('editor.toolbar.unorderedList')">☰</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('ol')" :title="$t('editor.toolbar.orderedList')">1.</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('code')" :title="$t('editor.toolbar.code')">&lt;/&gt;</button>
       </div>
       <div class="toolbar-divider"></div>
       <div class="toolbar-group">
-        <button type="button" class="tool-btn" @click="handleToolbar('link')" title="链接 (Ctrl+K)">🔗</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('image')" title="图片">🖼</button>
-        <button type="button" class="tool-btn" @click="handleToolbar('hr')" title="分割线">—</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('link')" :title="$t('editor.toolbar.link')">🔗</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('image')" :title="$t('editor.toolbar.image')">🖼</button>
+        <button type="button" class="tool-btn" @click="handleToolbar('hr')" :title="$t('editor.toolbar.horizontalRule')">—</button>
       </div>
       <div class="toolbar-spacer"></div>
       <div class="toolbar-group">
-        <button type="button" class="tool-btn" :class="{ active: mode === 'edit' }" @click="mode = 'edit'" title="仅编辑">编辑</button>
-        <button type="button" class="tool-btn" :class="{ active: mode === 'split' }" @click="mode = 'split'" title="分屏">分屏</button>
-        <button type="button" class="tool-btn" :class="{ active: mode === 'preview' }" @click="mode = 'preview'" title="预览">预览</button>
+        <button type="button" class="tool-btn" :class="{ active: mode === 'edit' }" @click="mode = 'edit'" :title="$t('editor.mode.edit')">{{ $t('editor.mode.edit') }}</button>
+        <button type="button" class="tool-btn" :class="{ active: mode === 'split' }" @click="mode = 'split'" :title="$t('editor.mode.split')">{{ $t('editor.mode.split') }}</button>
+        <button type="button" class="tool-btn" :class="{ active: mode === 'preview' }" @click="mode = 'preview'" :title="$t('editor.mode.preview')">{{ $t('editor.mode.preview') }}</button>
       </div>
     </div>
 
@@ -259,15 +262,15 @@ const handleKeydown = (e: KeyboardEvent) => {
         v-model="content"
         class="editor-textarea"
         :rows="rows || 12"
-        :placeholder="placeholder || '在这里输入 Markdown 内容...\n支持标题、加粗、列表、链接、图片等'"
+        :placeholder="placeholder || $t('editor.placeholder')"
         @keydown="handleKeydown"
       ></textarea>
       <div v-show="mode !== 'edit'" class="editor-preview prose" v-html="renderedHtml"></div>
     </div>
 
     <div class="editor-footer">
-      <span class="word-count">{{ wordCount }} 字</span>
-      <span class="shortcut-hint">Ctrl+B 粗体 · Ctrl+I 斜体 · Ctrl+K 链接 · Tab 缩进</span>
+      <span class="word-count">{{ wordCount }} {{ $t('editor.wordCountSuffix') }}</span>
+      <span class="shortcut-hint">{{ $t('editor.shortcutHint') }}</span>
     </div>
   </div>
 </template>

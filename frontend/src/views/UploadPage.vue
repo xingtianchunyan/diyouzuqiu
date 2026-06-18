@@ -31,11 +31,11 @@ const worksStore = useWorksStore()
 const matchesStore = useMatchesStore()
 
 const tabs = computed(() => [
-  { label: t('upload.member'), value: 'MEMBER' },
-  { label: t('upload.media'), value: 'MEDIA' },
-  { label: t('upload.work'), value: 'WORK' },
-  { label: t('upload.match'), value: 'MATCH' },
-  { label: t('upload.chronicle'), value: 'CHRONICLE' }
+  { label: t('upload.tabs.member'), value: 'MEMBER' },
+  { label: t('upload.tabs.media'), value: 'MEDIA' },
+  { label: t('upload.tabs.work'), value: 'WORK' },
+  { label: t('upload.tabs.match'), value: 'MATCH' },
+  { label: t('upload.tabs.chronicle'), value: 'CHRONICLE' }
 ])
 
 const visibleTabs = computed(() => {
@@ -124,41 +124,44 @@ const chronicleForm = ref({
 const showChronicleAdvanced = ref(false)
 
 // Dropdown Options
-const teamOptions = [
-  { label: 'None', value: '' },
-  { label: 'Red Team', value: 'RED' },
-  { label: 'Blue Team', value: 'BLUE' }
-]
+const teamOptions = computed(() => [
+  { label: t('common.team.none'), value: '' },
+  { label: t('common.team.red'), value: 'RED' },
+  { label: t('common.team.blue'), value: 'BLUE' }
+])
 
-const typeOptions = [
-  { label: 'Article', value: 'ARTICLE' },
-  { label: 'Poem', value: 'POEM' }
-]
+const typeOptions = computed(() => [
+  { label: t('works.articles'), value: 'ARTICLE' },
+  { label: t('works.poems'), value: 'POEM' }
+])
 
 const memberOptions = computed(() => [
-  { label: 'Unknown/None', value: '' },
+  { label: t('works.form.unknownAuthor'), value: '' },
   ...membersStore.members.map(m => ({ label: m.displayName, value: m.id }))
 ])
 
 const familyOptions = computed(() => [
-  { label: 'No Family', value: '' },
+  { label: t('people.form.noFamily'), value: '' },
   ...familiesStore.families.map(f => ({ label: f.label, value: f.id }))
 ])
 
 const participantOptions = computed(() => [
-  ...membersStore.members.map(m => ({ label: `${m.displayName} (${m.team || 'None'})`, value: m.id }))
+  ...membersStore.members.map(m => ({
+    label: `${m.displayName} (${m.team ? t(`common.team.${m.team.toLowerCase()}`) : t('common.team.none')})`,
+    value: m.id
+  }))
 ])
 
-const photoOptions = computed(() => 
+const photoOptions = computed(() =>
   mediaStore.mediaList.filter(m => m.type === 'PHOTO').map(m => ({
-    label: m.originalFilename || `Photo ${m.id.substring(0, 8)}`,
+    label: m.originalFilename || t('media.fallbackPhoto', { id: m.id.substring(0, 8) }),
     value: m.id
   }))
 )
 
-const videoOptions = computed(() => 
+const videoOptions = computed(() =>
   mediaStore.mediaList.filter(m => m.type === 'VIDEO').map(m => ({
-    label: m.originalFilename || `Video ${m.id.substring(0, 8)}`,
+    label: m.originalFilename || t('media.fallbackVideo', { id: m.id.substring(0, 8) }),
     value: m.id
   }))
 )
@@ -177,9 +180,13 @@ const poemOptions = computed(() =>
   }))
 )
 
-const matchOptions = computed(() => 
+const matchOptions = computed(() =>
   matchesStore.matches.map(m => ({
-    label: `${new Date(m.playedAt).toLocaleDateString()} - Red ${m.redScore}:${m.blueScore} Blue`,
+    label: t('matches.optionLabel', {
+      date: new Date(m.playedAt).toLocaleDateString(),
+      redScore: m.redScore,
+      blueScore: m.blueScore
+    }),
     value: m.id
   }))
 )
@@ -265,9 +272,9 @@ const createFamily = async () => {
     const family = await familiesStore.createFamily(label)
     memberForm.value.familyId = family.id
     newFamilyLabel.value = ''
-    showMessage('success', `Family "${family.label}" created`)
+    showMessage('success', t('upload.familyCreated', { label: family.label }))
   } catch (e: any) {
-    showMessage('error', e.response?.data?.error?.message || e.message || 'Failed to create family')
+    showMessage('error', e.response?.data?.error?.message || e.message || t('errors.createFamilyFailed'))
   } finally {
     creatingFamily.value = false
   }
@@ -276,7 +283,7 @@ const createFamily = async () => {
 const submitMember = async () => {
   try {
     loading.value = true
-    if (!memberForm.value.displayName) throw new Error('Display Name is required')
+    if (!memberForm.value.displayName) throw new Error(t('errors.displayNameRequired'))
     await membersService.createMember({
       displayName: memberForm.value.displayName,
       team: memberForm.value.team || undefined,
@@ -295,14 +302,14 @@ const submitMember = async () => {
 const submitMedia = async () => {
   try {
     loading.value = true
-    if (mediaForm.value.files.length === 0) throw new Error('File(s) are required')
+    if (mediaForm.value.files.length === 0) throw new Error(t('errors.mediaFilesRequired'))
 
     let successCount = 0
     const totalCount = mediaForm.value.files.length
 
     for (let i = 0; i < totalCount; i++) {
       const file = mediaForm.value.files[i]
-      loadingMessage.value = `Uploading ${i + 1} of ${totalCount}...`
+      loadingMessage.value = t('upload.uploadingProgress', { n: i + 1, total: totalCount })
 
       let finalTakenAt: Date | null = null
       
@@ -351,7 +358,7 @@ const submitMedia = async () => {
       successCount++
     }
 
-    showMessage('success', t('upload.success') + ` (${successCount} files)`)
+    showMessage('success', t('upload.success') + ' ' + t('upload.filesCount', { n: successCount }))
     mediaForm.value = { files: [], takenAt: '', year: '', personTagIds: [] }
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     if (fileInput) fileInput.value = ''
@@ -367,7 +374,7 @@ const submitWork = async () => {
   try {
     loading.value = true
     if (!workForm.value.title || !workForm.value.content || !workForm.value.date) {
-      throw new Error('Title, date and content are required')
+      throw new Error(t('errors.workRequiredFields'))
     }
     await worksService.createWork({
       type: workForm.value.type,
@@ -389,7 +396,7 @@ const submitWork = async () => {
 const submitMatch = async () => {
   try {
     loading.value = true
-    if (!matchForm.value.playedAt) throw new Error('Played At is required')
+    if (!matchForm.value.playedAt) throw new Error(t('errors.playedAtRequired'))
     const participants = matchForm.value.participantIds.map(id => {
       const member = membersStore.members.find(m => m.id === id)
       return { memberId: id, side: member?.team || 'RED' } as any
@@ -414,7 +421,7 @@ const submitChronicle = async () => {
   try {
     loading.value = true
     if (!chronicleForm.value.title || !chronicleForm.value.happenedAt) {
-      throw new Error('Title and date are required')
+      throw new Error(t('errors.chronicleRequiredFields'))
     }
     
     let mediaId = undefined
@@ -487,9 +494,9 @@ watch(currentTab, async () => {
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">DATA ENTRY</div>
+      <div class="label-micro delay-1 animate-slide-up">{{ t('upload.kicker') }}</div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('app.menu.upload') }}</h1>
-      <p class="editorial-subtitle delay-3 animate-slide-up">Contribute to the collective archive</p>
+      <p class="editorial-subtitle delay-3 animate-slide-up">{{ t('upload.subtitle') }}</p>
     </div>
 
     <div class="tabs-minimal delay-4 animate-slide-up" ref="tabsRef">
@@ -515,22 +522,22 @@ watch(currentTab, async () => {
       <!-- Member Form -->
       <form v-if="currentTab === 'MEMBER'" @submit.prevent="submitMember" class="editorial-form">
         <div class="form-group">
-          <label class="form-label">DISPLAY NAME *</label>
+          <label class="form-label">{{ t('upload.member.displayName') }}</label>
           <input v-model="memberForm.displayName" type="text" class="form-input" required />
         </div>
         <div class="form-group">
-          <label class="form-label">TEAM</label>
-          <OrganicDropdown v-model="memberForm.team" :options="teamOptions" placeholder="None" />
+          <label class="form-label">{{ t('upload.member.team') }}</label>
+          <OrganicDropdown v-model="memberForm.team" :options="teamOptions" :placeholder="t('common.team.none')" />
         </div>
         <div class="form-group">
-          <label class="form-label">FAMILY</label>
-          <OrganicDropdown v-model="memberForm.familyId" :options="familyOptions" placeholder="No Family" />
+          <label class="form-label">{{ t('upload.member.family') }}</label>
+          <OrganicDropdown v-model="memberForm.familyId" :options="familyOptions" :placeholder="t('people.form.noFamily')" />
           <div v-if="!memberForm.familyId" class="family-creator">
             <input
               v-model="newFamilyLabel"
               type="text"
               class="form-input"
-              placeholder="Or type a new family name..."
+              :placeholder="t('upload.member.newFamilyPlaceholder')"
               @keydown.enter.prevent="createFamily"
             />
             <button
@@ -540,7 +547,7 @@ watch(currentTab, async () => {
               @click="createFamily"
             >
               <span v-if="creatingFamily">...</span>
-              <span v-else>+ Create Family</span>
+              <span v-else>{{ t('upload.member.createFamily') }}</span>
             </button>
           </div>
         </div>
@@ -553,23 +560,23 @@ watch(currentTab, async () => {
       <!-- Media Form -->
       <form v-if="currentTab === 'MEDIA'" @submit.prevent="submitMedia" class="editorial-form">
         <div class="form-group">
-          <label class="form-label">FILES *</label>
+          <label class="form-label">{{ t('upload.media.files') }}</label>
           <input type="file" @change="onFileChange" class="form-file" accept="image/*,video/*" multiple required />
-          <small class="help-text">You can select multiple files. Dates and years will be auto-extracted from file EXIF.</small>
+          <small class="help-text">{{ t('upload.media.help') }}</small>
         </div>
         <div class="form-group">
-          <label class="form-label">TAKEN AT (OVERRIDE)</label>
+          <label class="form-label">{{ t('upload.media.takenAt') }}</label>
           <input v-model="mediaForm.takenAt" type="datetime-local" class="form-input" />
-          <small class="help-text">Leave blank to use original photo dates.</small>
+          <small class="help-text">{{ t('upload.media.takenAtHelp') }}</small>
         </div>
         <div class="form-group">
-          <label class="form-label">YEAR (OVERRIDE)</label>
-          <input v-model.number="mediaForm.year" type="number" class="form-input" placeholder="YYYY" />
+          <label class="form-label">{{ t('upload.media.year') }}</label>
+          <input v-model.number="mediaForm.year" type="number" class="form-input" :placeholder="t('media.form.yearPlaceholder')" />
         </div>
         <div class="form-group">
-          <label class="form-label">SUBJECT TAGS</label>
-          <OrganicDropdown v-model="mediaForm.personTagIds" :options="memberOptions" :multiple="true" placeholder="Select tags..." />
-          <small class="help-text">Click to select multiple</small>
+          <label class="form-label">{{ t('upload.media.personTags') }}</label>
+          <OrganicDropdown v-model="mediaForm.personTagIds" :options="memberOptions" :multiple="true" :placeholder="t('media.form.selectTags')" />
+          <small class="help-text">{{ t('upload.media.tagsHelp') }}</small>
         </div>
         <button type="submit" class="editorial-btn" :disabled="loading">
           <span v-if="loading">...</span>
@@ -581,36 +588,36 @@ watch(currentTab, async () => {
       <SmartImport v-if="currentTab === 'WORK'" :targetType="currentTab" @parsed="onWorkParsed" />
       <form v-if="currentTab === 'WORK'" @submit.prevent="submitWork" class="editorial-form">
         <div class="form-group">
-          <label class="form-label">TYPE *</label>
+          <label class="form-label">{{ t('upload.work.type') }}</label>
           <OrganicToggle v-model="workForm.type" :options="typeOptions" />
         </div>
         <div class="form-group">
-          <label class="form-label">TITLE *</label>
+          <label class="form-label">{{ t('upload.work.title') }}</label>
           <input v-model="workForm.title" type="text" class="form-input" required />
         </div>
         <div class="form-group">
-          <label class="form-label">AUTHOR</label>
+          <label class="form-label">{{ t('upload.work.author') }}</label>
           <OrganicDropdown
             v-model="workForm.authorId"
             :options="memberOptions"
-            placeholder="选择已有队员"
+            :placeholder="t('works.form.selectAuthor')"
             @change="workForm.authorName = ''"
           />
           <input
             v-model="workForm.authorName"
             type="text"
             class="form-input author-name-input"
-            placeholder="或输入新作者名"
+            :placeholder="t('works.form.orNewAuthor')"
             @input="workForm.authorId = ''"
           />
         </div>
         <div class="form-group">
-          <label class="form-label">DATE (YYYY-MM-DD) *</label>
+          <label class="form-label">{{ t('upload.work.date') }}</label>
           <input type="date" v-model="workForm.date" class="form-input" required />
         </div>
         <div class="form-group">
-          <label class="form-label">CONTENT *</label>
-          <MarkdownEditor v-model="workForm.content" placeholder="输入文章正文..." />
+          <label class="form-label">{{ t('upload.work.content') }}</label>
+          <MarkdownEditor v-model="workForm.content" :placeholder="t('works.form.contentPlaceholder')" />
         </div>
         <button type="submit" class="editorial-btn" :disabled="loading">
           <span v-if="loading">...</span>
@@ -621,27 +628,27 @@ watch(currentTab, async () => {
       <!-- Match Form -->
       <form v-if="currentTab === 'MATCH'" @submit.prevent="submitMatch" class="editorial-form">
         <div class="form-group">
-          <label class="form-label">PLAYED AT *</label>
+          <label class="form-label">{{ t('upload.match.playedAt') }}</label>
           <input v-model="matchForm.playedAt" type="datetime-local" class="form-input" required />
         </div>
         <div class="score-row">
           <div class="form-group flex-1">
-            <label class="form-label">RED SCORE *</label>
+            <label class="form-label">{{ t('upload.match.redScore') }}</label>
             <input v-model.number="matchForm.redScore" type="number" class="form-input" required min="0" />
           </div>
           <div class="form-group flex-1">
-            <label class="form-label">BLUE SCORE *</label>
+            <label class="form-label">{{ t('upload.match.blueScore') }}</label>
             <input v-model.number="matchForm.blueScore" type="number" class="form-input" required min="0" />
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">MVP</label>
-          <OrganicDropdown v-model="matchForm.mvpMemberId" :options="memberOptions" placeholder="None" />
+          <label class="form-label">{{ t('upload.match.mvp') }}</label>
+          <OrganicDropdown v-model="matchForm.mvpMemberId" :options="memberOptions" :placeholder="t('common.team.none')" />
         </div>
         <div class="form-group">
-          <label class="form-label">PARTICIPANTS</label>
-          <OrganicDropdown v-model="matchForm.participantIds" :options="participantOptions" :multiple="true" placeholder="Select participants..." />
-          <small class="help-text">Click to select multiple</small>
+          <label class="form-label">{{ t('upload.match.participants') }}</label>
+          <OrganicDropdown v-model="matchForm.participantIds" :options="participantOptions" :multiple="true" :placeholder="t('matches.form.selectParticipants')" />
+          <small class="help-text">{{ t('upload.match.participantsHelp') }}</small>
         </div>
         <button type="submit" class="editorial-btn" :disabled="loading">
           <span v-if="loading">...</span>
@@ -652,19 +659,19 @@ watch(currentTab, async () => {
       <!-- Chronicle Form -->
       <form v-if="currentTab === 'CHRONICLE'" @submit.prevent="submitChronicle" class="editorial-form">
         <div class="form-group">
-          <label class="form-label">TITLE *</label>
+          <label class="form-label">{{ t('upload.chronicle.title') }}</label>
           <input v-model="chronicleForm.title" type="text" class="form-input" required />
         </div>
         <div class="form-group">
-          <label class="form-label">HAPPENED AT *</label>
+          <label class="form-label">{{ t('upload.chronicle.happenedAt') }}</label>
           <input v-model="chronicleForm.happenedAt" type="date" class="form-input" required />
         </div>
         <div class="form-group">
-          <label class="form-label">DESCRIPTION</label>
-          <MarkdownEditor v-model="chronicleForm.description" placeholder="输入纪事描述..." :rows="6" />
+          <label class="form-label">{{ t('upload.chronicle.description') }}</label>
+          <MarkdownEditor v-model="chronicleForm.description" :placeholder="t('chronicles.form.descriptionPlaceholder')" :rows="6" />
         </div>
         <div class="form-group">
-          <label class="form-label">MEDIA (IMAGE/VIDEO)</label>
+          <label class="form-label">{{ t('upload.chronicle.media') }}</label>
           <input type="file" @change="onChronicleFileChange" class="form-file" accept="image/*,video/*" />
         </div>
 
@@ -676,32 +683,32 @@ watch(currentTab, async () => {
 
         <div class="advanced-section">
           <button type="button" class="advanced-toggle" @click="showChronicleAdvanced = !showChronicleAdvanced">
-            {{ showChronicleAdvanced ? '收起高级关联' : '展开高级关联（可选）' }}
+            {{ showChronicleAdvanced ? t('upload.chronicle.collapseAdvanced') : t('upload.chronicle.expandAdvanced') }}
           </button>
           <div v-if="showChronicleAdvanced" class="advanced-fields">
             <div class="form-group">
-              <label class="form-label">ASSOCIATED MEMBERS</label>
-              <OrganicDropdown v-model="chronicleForm.memberIds" :options="memberOptions" :multiple="true" placeholder="Select members..." />
+              <label class="form-label">{{ t('upload.chronicle.members') }}</label>
+              <OrganicDropdown v-model="chronicleForm.memberIds" :options="memberOptions" :multiple="true" :placeholder="t('chronicles.form.selectMembers')" />
             </div>
             <div class="form-group">
-              <label class="form-label">ASSOCIATED PHOTOS</label>
-              <OrganicDropdown v-model="chronicleForm.photoIds" :options="photoOptions" :multiple="true" placeholder="Select photos..." />
+              <label class="form-label">{{ t('upload.chronicle.photos') }}</label>
+              <OrganicDropdown v-model="chronicleForm.photoIds" :options="photoOptions" :multiple="true" :placeholder="t('chronicles.form.selectPhotos')" />
             </div>
             <div class="form-group">
-              <label class="form-label">ASSOCIATED VIDEOS</label>
-              <OrganicDropdown v-model="chronicleForm.videoIds" :options="videoOptions" :multiple="true" placeholder="Select videos..." />
+              <label class="form-label">{{ t('upload.chronicle.videos') }}</label>
+              <OrganicDropdown v-model="chronicleForm.videoIds" :options="videoOptions" :multiple="true" :placeholder="t('chronicles.form.selectVideos')" />
             </div>
             <div class="form-group">
-              <label class="form-label">ASSOCIATED ARTICLES</label>
-              <OrganicDropdown v-model="chronicleForm.articleIds" :options="articleOptions" :multiple="true" placeholder="Select articles..." />
+              <label class="form-label">{{ t('upload.chronicle.articles') }}</label>
+              <OrganicDropdown v-model="chronicleForm.articleIds" :options="articleOptions" :multiple="true" :placeholder="t('chronicles.form.selectArticles')" />
             </div>
             <div class="form-group">
-              <label class="form-label">ASSOCIATED POEMS</label>
-              <OrganicDropdown v-model="chronicleForm.poemIds" :options="poemOptions" :multiple="true" placeholder="Select poems..." />
+              <label class="form-label">{{ t('upload.chronicle.poems') }}</label>
+              <OrganicDropdown v-model="chronicleForm.poemIds" :options="poemOptions" :multiple="true" :placeholder="t('chronicles.form.selectPoems')" />
             </div>
             <div class="form-group">
-              <label class="form-label">ASSOCIATED MATCHES</label>
-              <OrganicDropdown v-model="chronicleForm.matchIds" :options="matchOptions" :multiple="true" placeholder="Select matches..." />
+              <label class="form-label">{{ t('upload.chronicle.matches') }}</label>
+              <OrganicDropdown v-model="chronicleForm.matchIds" :options="matchOptions" :multiple="true" :placeholder="t('chronicles.form.selectMatches')" />
             </div>
           </div>
         </div>

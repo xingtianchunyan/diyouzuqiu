@@ -57,8 +57,8 @@ const personOptions = computed(() => {
 
 const typeOptions = computed(() => [
   { label: t('app.all'), value: '' },
-  { label: 'Photos', value: 'PHOTO' },
-  { label: 'Videos', value: 'VIDEO' }
+  { label: t('media.type.photos'), value: 'PHOTO' },
+  { label: t('media.type.videos'), value: 'VIDEO' }
 ])
 
 const fetchPersons = async () => {
@@ -82,7 +82,7 @@ const fetchMedia = async () => {
     const res = await mediaService.getMediaList(params)
     mediaList.value = res.data
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to load media'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.loadMediaFailed')
   } finally {
     loading.value = false
   }
@@ -109,13 +109,13 @@ const canDeleteMedia = (item: Media): boolean => {
 }
 
 const handleDeleteMedia = async (mediaId: string) => {
-  if (confirm('确认删除这张照片吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteMedia'))) {
     try {
       await mediaService.deleteMedia(mediaId)
       mediaList.value = mediaList.value.filter(m => m.id !== mediaId)
       selectedMedia.value = null
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete media')
+      alert(err.response?.data?.error?.message || t('errors.deleteMediaFailed'))
     }
   }
 }
@@ -124,7 +124,9 @@ const handleDeleteMedia = async (mediaId: string) => {
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">ARCHIVE</div>
+      <div class="label-micro delay-1 animate-slide-up">
+        {{ t('media.archive') }}
+      </div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('app.menu.media') }}</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
         <p class="editorial-subtitle">{{ t('home.nav.mediaDesc') }}</p>
@@ -136,17 +138,17 @@ const handleDeleteMedia = async (mediaId: string) => {
 
     <div class="filters-row delay-4 animate-slide-up">
       <div class="filter-group">
-        <label class="label-micro">TYPE</label>
+        <label class="label-micro">{{ t('media.filters.type') }}</label>
         <OrganicDropdown v-model="filterType" :options="typeOptions" :placeholder="t('app.all')" />
       </div>
       
       <div class="filter-group">
-        <label class="label-micro">YEAR</label>
+        <label class="label-micro">{{ t('media.filters.year') }}</label>
         <OrganicDropdown v-model="filterYear" :options="yearOptions" :placeholder="t('app.all')" />
       </div>
 
       <div class="filter-group">
-        <label class="label-micro">SUBJECT</label>
+        <label class="label-micro">{{ t('media.filters.subject') }}</label>
         <OrganicDropdown v-model="filterPerson" :options="personOptions" :placeholder="t('app.all')" />
       </div>
     </div>
@@ -155,13 +157,13 @@ const handleDeleteMedia = async (mediaId: string) => {
 
     <div v-if="loading" class="loading-state delay-4 animate-slide-up">
       <div class="spinner"></div>
-      <span>Retrieving archives...</span>
+      <span>{{ t('media.loading') }}</span>
     </div>
 
     <BaseEmptyState
       v-else-if="error"
       :title="error"
-      description="Unable to load media at this time."
+      :description="t('media.loadErrorDescription')"
       class="delay-4 animate-slide-up"
     />
 
@@ -176,8 +178,8 @@ const handleDeleteMedia = async (mediaId: string) => {
     />
 
     <div v-else class="empty-archive delay-4 animate-slide-up">
-      <p class="empty-text">No records found matching your criteria.</p>
-      <button class="minimal-btn" @click="router.push('/upload')">CONTRIBUTE TO ARCHIVE</button>
+      <p class="empty-text">{{ t('media.noRecords') }}</p>
+      <button class="minimal-btn" @click="router.push('/upload')">{{ t('history.contribute') }}</button>
     </div>
   </main>
 

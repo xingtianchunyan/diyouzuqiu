@@ -3,14 +3,23 @@ import { prisma } from '../../lib/prisma.js'
 import bcrypt from 'bcryptjs'
 import { validateBody, validateParams, z } from '../../lib/validate.js'
 import { validatePassword } from '../../lib/password.js'
+import { sanitizeCsvCell } from '../../lib/csv-sanitize.js'
+import { parseExcelToRows } from '../../lib/documentParser.js'
 
 const userIdParamsSchema = z.object({
   id: z.string().min(1)
 })
 
+const PHONE_REGEX = /^1[3-9]\d{9}$/
+
+function phoneSchema() {
+  return z.string().regex(PHONE_REGEX, 'Invalid phone number').optional().nullable()
+}
+
 const createUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  phone: phoneSchema(),
   role: z.enum(['ADMIN', 'MEMBER']).optional(),
   memberId: z.string().optional().nullable()
 })
@@ -18,6 +27,7 @@ const createUserSchema = z.object({
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
+  phone: phoneSchema(),
   role: z.enum(['ADMIN', 'MEMBER']).optional(),
   memberId: z.string().optional().nullable()
 })
@@ -55,6 +65,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     return users.map((u: any) => ({
       id: u.id,
       email: u.email,
+      phone: u.phone,
       role: u.role,
       memberId: u.memberId,
       member: u.member
@@ -62,9 +73,10 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.post('/', { preValidation: validateBody(createUserSchema) }, async (request, reply) => {
-    const { email, password, role, memberId } = (request as any).validatedBody as {
+    const { email, password, phone, role, memberId } = (request as any).validatedBody as {
       email: string
       password: string
+      phone?: string | null
       role?: 'ADMIN' | 'MEMBER'
       memberId?: string | null
     }
@@ -79,18 +91,26 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(409).send({ error: { code: 'USER_EXISTS', message: 'Email already exists' } })
     }
 
+    if (phone) {
+      const existingPhone = await prisma.user.findUnique({ where: { phone } })
+      if (existingPhone) {
+        return reply.code(409).send({ error: { code: 'PHONE_EXISTS', message: 'Phone number already exists' } })
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const user = await prisma.user.create({
       data: {
         email,
+        phone: phone || null,
         password: hashedPassword,
         role: role || 'MEMBER',
         memberId: memberId || null
       }
     })
 
-    return { id: user.id, email: user.email, role: user.role, memberId: user.memberId }
+    return { id: user.id, email: user.email, phone: user.phone, role: user.role, memberId: user.memberId }
   })
 
   app.post('/batch', { preValidation: validateBody(batchCreateUsersSchema) }, async (request, reply) => {
@@ -123,6 +143,10 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
 
       for (const [index, row] of users.entries()) {
         try {
+          // Sanitize user-visible text fields to prevent CSV/Excel formula injection
+          row.memberName = sanitizeCsvCell(row.memberName) as string | undefined
+          row.familyName = sanitizeCsvCell(row.familyName) as string | undefined
+
           const passwordCheck = validatePassword(row.password)
           if (!passwordCheck.valid) {
             throw new Error(passwordCheck.message)
@@ -184,11 +208,46 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(200).send({ success: summary.failed.length === 0, summary })
   })
 
+  app.post('/parse-excel', async (request, reply) => {
+    if (!request.isMultipart()) {
+      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Multipart file upload required' } })
+    }
+
+    const data = await request.file()
+    if (!data?.filename) {
+      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'No file uploaded' } })
+    }
+
+    const filename = data.filename.toLowerCase()
+    if (!filename.endsWith('.xlsx') && !filename.endsWith('.xls')) {
+      return reply.code(400).send({ error: { code: 'INVALID_FILE_TYPE', message: 'Only .xlsx and .xls files are supported' } })
+    }
+
+    const chunks: Buffer[] = []
+    for await (const chunk of data.file) {
+      chunks.push(chunk)
+    }
+    const buffer = Buffer.concat(chunks)
+
+    if (buffer.length === 0) {
+      return reply.code(400).send({ error: { code: 'EMPTY_FILE', message: 'Uploaded file is empty' } })
+    }
+
+    try {
+      const rows = await parseExcelToRows(buffer)
+      return { rows }
+    } catch (err: any) {
+      request.log.error(err)
+      return reply.code(400).send({ error: { code: 'PARSE_ERROR', message: err?.message || 'Failed to parse Excel file' } })
+    }
+  })
+
   app.put('/:id', { preValidation: [validateParams(userIdParamsSchema), validateBody(updateUserSchema)] }, async (request, reply) => {
     const { id } = (request as any).validatedParams as { id: string }
-    const { email, password, role, memberId } = (request as any).validatedBody as {
+    const { email, password, phone, role, memberId } = (request as any).validatedBody as {
       email?: string
       password?: string
+      phone?: string | null
       role?: 'ADMIN' | 'MEMBER'
       memberId?: string | null
     }
@@ -201,12 +260,22 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       }
       data.email = email
     }
+    if (phone !== undefined) {
+      if (phone) {
+        const existing = await prisma.user.findUnique({ where: { phone } })
+        if (existing && existing.id !== id) {
+          return reply.code(409).send({ error: { code: 'PHONE_EXISTS', message: 'Phone number already exists' } })
+        }
+      }
+      data.phone = phone || null
+    }
     if (password) {
       const passwordCheck = validatePassword(password)
       if (!passwordCheck.valid) {
         return reply.code(400).send({ error: { code: 'WEAK_PASSWORD', message: passwordCheck.message } })
       }
       data.password = await bcrypt.hash(password, 10)
+      data.tokenVersion = { increment: 1 }
     }
     if (role) data.role = role
     if (memberId !== undefined) data.memberId = memberId || null
@@ -217,7 +286,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       include: { member: { select: { id: true, displayName: true } } }
     })
 
-    return { id: user.id, email: user.email, role: user.role, memberId: user.memberId, member: user.member }
+    return { id: user.id, email: user.email, phone: user.phone, role: user.role, memberId: user.memberId, member: user.member }
   })
 
   app.delete('/:id', { preValidation: validateParams(userIdParamsSchema) }, async (request, reply) => {
@@ -253,7 +322,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     const hashedPassword = await bcrypt.hash(password, 10)
     await prisma.user.update({
       where: { id },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword, tokenVersion: { increment: 1 } }
     })
 
     return { message: 'Password reset successfully' }

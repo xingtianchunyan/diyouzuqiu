@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { Work } from '../../api/services/works.service'
 import MarkdownRenderer from '../editor/MarkdownRenderer.vue'
 
@@ -14,6 +15,13 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'delete', work: Work): void
 }>()
+
+const { t } = useI18n()
+
+const typeLabel = computed(() => {
+  if (!props.work) return ''
+  return props.work.type === 'ARTICLE' ? t('works.articles') : t('works.poems')
+})
 
 const metaLine = computed(() => {
   if (!props.work) return ''
@@ -48,21 +56,21 @@ onUnmounted(() => {
     <div v-if="props.work || props.loading" class="reader-overlay" @click="emit('close')">
       <div class="reader" @click.stop>
         <header class="reader-topbar">
-          <button type="button" class="close-btn" @click="emit('close')">
+          <button type="button" class="close-btn" @click="emit('close')" :title="t('common.close')">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
           <div class="topbar-center">
-            <div class="topbar-type" v-if="props.work">{{ props.work.type }}</div>
+            <div class="topbar-type" v-if="props.work">{{ typeLabel }}</div>
           </div>
           <div class="topbar-right">
             <RouterLink
               v-if="props.work"
               :to="`/works/${props.work.id}`"
               class="reader-link-btn"
-              title="打开独立页面"
+              :title="t('works.openDetailPage')"
               @click.stop
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
@@ -71,7 +79,7 @@ onUnmounted(() => {
               v-if="props.work && props.canDelete && props.canDelete(props.work)" 
               class="reader-delete-btn"
               @click.stop="emit('delete', props.work)"
-              title="Delete"
+              :title="t('common.delete')"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -83,7 +91,7 @@ onUnmounted(() => {
 
         <div v-if="props.loading" class="reader-loading">
           <div class="spinner"></div>
-          <span>Loading...</span>
+          <span>{{ t('common.loading') }}</span>
         </div>
 
         <article v-else-if="props.work" class="reader-body">
@@ -94,7 +102,7 @@ onUnmounted(() => {
 
           <div class="reader-content">
             <MarkdownRenderer :markdown="props.work?.content || ''" />
-            <p v-if="!props.work?.content" class="reader-paragraph reader-empty">No content.</p>
+            <p v-if="!props.work?.content" class="reader-paragraph reader-empty">{{ t('works.noContent') }}</p>
           </div>
         </article>
       </div>

@@ -126,7 +126,7 @@ const onAvatarChange = async (e: Event) => {
       person.value.avatarUrl = res.data.avatarUrl
     }
   } catch (err: any) {
-    alert(err.response?.data?.error?.message || 'Failed to upload avatar')
+    alert(err.response?.data?.error?.message || t('errors.uploadAvatarFailed'))
   }
 }
 
@@ -164,7 +164,7 @@ const canDeleteChronicle = (chronicle: any) => {
 }
 
 const handleDeleteMedia = async (mediaId: string) => {
-  if (confirm('确认删除这张照片吗？此操作不可恢复。')) {
+  if (confirm(t('person.confirmDeleteMedia'))) {
     try {
       await mediaService.deleteMedia(mediaId)
       mediaList.value = mediaList.value.filter(m => m.id !== mediaId)
@@ -172,13 +172,13 @@ const handleDeleteMedia = async (mediaId: string) => {
         person.value.mediaCount = (person.value.mediaCount ?? 0) - 1
       }
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete media')
+      alert(err.response?.data?.error?.message || t('errors.deleteMediaFailed'))
     }
   }
 }
 
 const handleDeleteWork = async (work: Work) => {
-  if (confirm('确认删除该作品吗？此操作不可恢复。')) {
+  if (confirm(t('person.confirmDeleteWork'))) {
     try {
       await worksService.deleteWork(work.id)
       worksList.value = worksList.value.filter(w => w.id !== work.id)
@@ -187,13 +187,13 @@ const handleDeleteWork = async (work: Work) => {
         person.value.worksCount = (person.value.worksCount ?? 0) - 1
       }
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete work')
+      alert(err.response?.data?.error?.message || t('errors.deleteWorkFailed'))
     }
   }
 }
 
 const handleDeleteMatch = async (match: Match) => {
-  if (confirm('确认删除该比赛记录吗？此操作不可恢复。')) {
+  if (confirm(t('person.confirmDeleteMatch'))) {
     try {
       await matchesService.deleteMatch(match.id)
       matchesList.value = matchesList.value.filter(m => m.id !== match.id)
@@ -201,18 +201,18 @@ const handleDeleteMatch = async (match: Match) => {
         person.value.matchesCount = (person.value.matchesCount ?? 0) - 1
       }
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete match')
+      alert(err.response?.data?.error?.message || t('errors.deleteMatchFailed'))
     }
   }
 }
 
 const handleDeleteChronicle = async (chronicle: any) => {
-  if (confirm('确认删除该纪事吗？此操作不可恢复。')) {
+  if (confirm(t('person.confirmDeleteChronicle'))) {
     try {
       await chroniclesService.deleteChronicle(chronicle.id)
       chroniclesList.value = chroniclesList.value.filter(c => c.id !== chronicle.id)
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete chronicle')
+      alert(err.response?.data?.error?.message || t('errors.deleteChronicleFailed'))
     }
   }
 }
@@ -241,7 +241,7 @@ const loadPerson = async () => {
     worksList.value = worksRes.data
     matchesList.value = matchesRes.data
   } catch (err: any) {
-    error.value = err.message || 'Failed to load person details'
+    error.value = err.message || t('errors.loadPersonFailed')
   } finally {
     loading.value = false
   }
@@ -251,7 +251,7 @@ const groupedMedia = computed(() => {
   const groups: Record<string, Media[]> = {}
   for (const m of mediaList.value) {
     const d = m.takenAt ? new Date(m.takenAt) : null
-    let key = 'Unknown Date'
+    let key = t('common.unknownDate')
     if (d && !isNaN(d.getTime())) {
       key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     } else if (m.year) {
@@ -310,12 +310,12 @@ onUnmounted(() => {
           <polyline points="12 19 5 12 12 5"></polyline>
         </svg>
       </button>
-      <h1 class="page-title">{{ person?.displayName || 'Loading...' }}</h1>
+      <h1 class="page-title">{{ person?.displayName || $t('common.loading') }}</h1>
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
-    <EmptyState v-else-if="error" :title="error" :description="'Unable to load person details'" />
-    <EmptyState v-else-if="!person" title="Person Not Found" description="The requested person could not be found." />
+    <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
+    <EmptyState v-else-if="error" :title="error" :description="$t('person.loadErrorDescription')" />
+    <EmptyState v-else-if="!person" :title="$t('person.notFoundTitle')" :description="$t('person.notFoundDescription')" />
     <template v-else>
       <!-- Fixed Header Section -->
       <div class="profile-header">
@@ -329,25 +329,25 @@ onUnmounted(() => {
             <span v-else>{{ person.displayName.charAt(0).toUpperCase() }}</span>
             
             <label v-if="canEdit" class="edit-avatar-btn">
-              修改头像
+              {{ $t('person.changeAvatar') }}
               <input type="file" @change="onAvatarChange" accept="image/*" style="display: none" />
             </label>
           </div>
           <div class="profile-info">
             <h2>
               {{ person.displayName }}
-              <span v-if="person.isCaptain" class="captain-badge" title="队长">👑</span>
+              <span v-if="person.isCaptain" class="captain-badge" :title="$t('people.captain')">👑</span>
             </h2>
             <div class="tags">
               <span v-if="person.familyId" class="tag family">
-                {{ familiesStore.familyById[person.familyId] || 'Family' }}
+                {{ familiesStore.familyById[person.familyId] || $t('people.family') }}
               </span>
               <span v-if="person.team" class="tag" :class="person.team.toLowerCase()">
-                {{ person.team === 'RED' ? t('people.red') : t('people.blue') }}
+                {{ person.team === 'RED' ? $t('people.red') : $t('people.blue') }}
               </span>
             </div>
             <button v-if="canEdit" class="edit-profile-btn" @click="editingMember = person">
-              编辑资料
+              {{ $t('person.editProfile') }}
             </button>
           </div>
         </div>
@@ -375,28 +375,28 @@ onUnmounted(() => {
           <!-- Media Tab -->
           <div v-else-if="activeTab === 'media'">
             <div v-if="groupedMedia.length === 0" class="empty-archive">
-              <p class="empty-text">No media records found.</p>
+              <p class="empty-text">{{ $t('person.noMedia') }}</p>
             </div>
             <div v-else>
               <div v-for="group in groupedMedia" :key="group.label" class="media-month-group">
                 <MonthGroupHeading :label="group.label" />
                 <div class="media-gallery">
                   <div v-for="item in group.items" :key="item.id" class="media-frame" @click="selectedMedia = item">
-                    <img :src="mediaService.getMediaFileUrl(item.id)" alt="Media" class="media-img" v-if="item.type === 'PHOTO'" loading="lazy" />
+                    <img :src="mediaService.getMediaFileUrl(item.id)" :alt="$t('media.alt')" class="media-img" v-if="item.type === 'PHOTO'" loading="lazy" />
                     <video :src="mediaService.getMediaFileUrl(item.id)" class="media-video" v-else-if="item.type === 'VIDEO'" controls preload="metadata"></video>
 
                     <div v-if="canDeleteMedia(item)" class="media-actions">
                       <button
                         class="edit-media-btn"
                         @click.stop="editingMedia = item"
-                        title="Edit"
+                        :title="$t('common.edit')"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       </button>
                       <button
                         class="delete-media-btn"
                         @click.stop="handleDeleteMedia(item.id)"
-                        title="Delete"
+                        :title="$t('common.delete')"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                       </button>
@@ -496,20 +496,20 @@ onUnmounted(() => {
           autoplay
           @dblclick="selectedMedia = null"
         ></video>
-        <div class="lightbox-hint">✌️ 双指缩放，双击关闭</div>
+        <div class="lightbox-hint">{{ $t('media.lightboxHint') }}</div>
         <RouterLink
           v-if="selectedMedia"
           :to="`/media/${selectedMedia.id}`"
           class="lightbox-link"
-          title="打开独立页面"
+          :title="$t('media.openDetailPage')"
           @click.stop
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
         </RouterLink>
         <div class="lightbox-info" v-if="selectedMedia">
-          <p v-if="selectedMedia.takenAt">{{ t('upload.media') }} Time: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
+          <p v-if="selectedMedia.takenAt">{{ $t('media.timeLabel') }}: {{ new Date(selectedMedia.takenAt).toLocaleString() }}</p>
           <p v-if="selectedMedia.personTags && selectedMedia.personTags.length > 0">
-            Members: {{ selectedMedia.personTags.map((p: any) => p.displayName).join(', ') }}
+            {{ $t('media.membersLabel') }}: {{ selectedMedia.personTags.map((p: any) => p.displayName).join(', ') }}
           </p>
         </div>
       </div>

@@ -45,12 +45,12 @@ const toLocalDatetime = (iso: string | null | undefined) => {
 }
 
 const memberOptions = computed(() => [
-  { label: 'None', value: '' },
+  { label: t('common.none'), value: '' },
   ...membersStore.members.map(m => ({ label: m.displayName, value: m.id }))
 ])
 
 const participantOptions = computed(() => [
-  ...membersStore.members.map(m => ({ label: `${m.displayName} (${m.team || 'None'})`, value: m.id }))
+  ...membersStore.members.map(m => ({ label: `${m.displayName} (${m.team || t('common.team.none')})`, value: m.id }))
 ])
 
 watch(() => props.match, (match) => {
@@ -71,7 +71,7 @@ watch(() => props.match, (match) => {
 const handleSubmit = async () => {
   if (!props.match) return
   if (!form.value.playedAt) {
-    error.value = 'Played At is required'
+    error.value = t('errors.playedAtRequired')
     return
   }
   loading.value = true
@@ -94,7 +94,7 @@ const handleSubmit = async () => {
     emit('updated', res.data)
     emit('close')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update match'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.updateMatchFailed')
   } finally {
     loading.value = false
   }
@@ -106,7 +106,7 @@ const handleSubmit = async () => {
     <div v-if="match" class="modal-overlay" @click="emit('close')">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ t('matches.editTitle') || 'Edit Match' }}</h2>
+          <h2 class="modal-title">{{ t('matches.editTitle') }}</h2>
           <button class="close-btn" @click="emit('close')">&times;</button>
         </div>
 
@@ -114,43 +114,43 @@ const handleSubmit = async () => {
 
         <form @submit.prevent="handleSubmit" class="editorial-form">
           <div class="form-group">
-            <label class="form-label">PLAYED AT *</label>
+            <label class="form-label">{{ t('matches.form.playedAt') }}</label>
             <input v-model="form.playedAt" type="datetime-local" class="form-input" required />
           </div>
 
           <div class="score-row">
             <div class="form-group flex-1">
-              <label class="form-label">RED SCORE *</label>
+              <label class="form-label">{{ t('matches.form.redScore') }}</label>
               <input v-model.number="form.redScore" type="number" class="form-input" required min="0" />
             </div>
             <div class="form-group flex-1">
-              <label class="form-label">BLUE SCORE *</label>
+              <label class="form-label">{{ t('matches.form.blueScore') }}</label>
               <input v-model.number="form.blueScore" type="number" class="form-input" required min="0" />
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">MVP</label>
-            <OrganicDropdown v-model="form.mvpMemberId" :options="memberOptions" placeholder="None" />
+            <label class="form-label">{{ t('matches.form.mvp') }}</label>
+            <OrganicDropdown v-model="form.mvpMemberId" :options="memberOptions" :placeholder="t('common.none')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">PARTICIPANTS</label>
-            <OrganicDropdown v-model="form.participantIds" :options="participantOptions" :multiple="true" placeholder="Select participants..." />
+            <label class="form-label">{{ t('matches.form.participants') }}</label>
+            <OrganicDropdown v-model="form.participantIds" :options="participantOptions" :multiple="true" :placeholder="t('matches.form.selectParticipants')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">NOTES</label>
+            <label class="form-label">{{ t('matches.form.notes') }}</label>
             <textarea v-model="form.notes" class="form-textarea" rows="3"></textarea>
           </div>
 
           <div class="form-actions">
             <button type="button" class="editorial-btn secondary" @click="emit('close')">
-              {{ t('common.cancel') || 'Cancel' }}
+              {{ t('common.cancel') }}
             </button>
             <button type="submit" class="editorial-btn" :disabled="loading">
-              <span v-if="loading">...</span>
-              <span v-else>{{ t('common.save') || 'Save' }}</span>
+              <span v-if="loading">{{ t('common.loading') }}</span>
+              <span v-else>{{ t('common.save') }}</span>
             </button>
           </div>
         </form>

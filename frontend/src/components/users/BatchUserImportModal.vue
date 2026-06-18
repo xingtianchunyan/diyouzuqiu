@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Papa from 'papaparse'
 import { usersService } from '../../api/services/users.service'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   show: boolean
@@ -22,12 +25,12 @@ type ImportRow = {
 }
 
 const COLUMNS: { key: keyof ImportRow; label: string; type: 'text' | 'password' | 'select'; options?: string[] }[] = [
-  { key: 'email', label: '邮箱', type: 'text' },
-  { key: 'password', label: '密码', type: 'password' },
-  { key: 'role', label: '角色', type: 'select', options: ['MEMBER', 'ADMIN'] },
-  { key: 'memberName', label: '队员姓名', type: 'text' },
-  { key: 'team', label: '队伍', type: 'select', options: ['', 'RED', 'BLUE'] },
-  { key: 'familyName', label: '家庭', type: 'text' }
+  { key: 'email', label: 'admin.batchImport.columns.email', type: 'text' },
+  { key: 'password', label: 'admin.batchImport.columns.password', type: 'password' },
+  { key: 'role', label: 'admin.batchImport.columns.role', type: 'select', options: ['MEMBER', 'ADMIN'] },
+  { key: 'memberName', label: 'admin.batchImport.columns.memberName', type: 'text' },
+  { key: 'team', label: 'admin.batchImport.columns.team', type: 'select', options: ['', 'RED', 'BLUE'] },
+  { key: 'familyName', label: 'admin.batchImport.columns.familyName', type: 'text' }
 ]
 
 const createEmptyRow = (): ImportRow => ({
@@ -45,6 +48,7 @@ const rows = ref<ImportRow[]>([
 ])
 
 const loading = ref(false)
+const parseLoading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const result = ref<{
   success: boolean
@@ -130,30 +134,22 @@ const handleFileUpload = async (event: Event) => {
   const file = target.files?.[0]
   if (!file) return
 
-  const readFile = (): Promise<string | ArrayBuffer> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result ?? '')
-      reader.onerror = reject
-      if (file.name.match(/\.(xlsx|xls)$/i)) {
-        reader.readAsArrayBuffer(file)
-      } else {
-        reader.readAsText(file)
-      }
-    })
+  const ext = file.name.split('.').pop()?.toLowerCase()
 
   try {
-    const data = await readFile()
-    const ext = file.name.split('.').pop()?.toLowerCase()
+    parseLoading.value = true
     let parsed: string[][] = []
 
     if (ext === 'xlsx' || ext === 'xls') {
-      const XLSX = await import('xlsx')
-      const workbook = XLSX.read(data, { type: 'array' })
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-      parsed = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1, defval: '' })
+      const res = await usersService.parseExcel(file)
+      parsed = res.data.rows
     } else {
-      const text = typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer)
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve((e.target?.result as string) ?? '')
+        reader.onerror = reject
+        reader.readAsText(file)
+      })
       const delimiter = ext === 'tsv' || text.includes('\t') ? '\t' : ','
       const parseResult = Papa.parse<string[]>(text, { delimiter, skipEmptyLines: true })
       parsed = parseResult.data
@@ -164,10 +160,13 @@ const handleFileUpload = async (event: Event) => {
       rows.value = imported
       result.value = null
     } else {
-      alert('未能从文件中识别到有效数据，请检查表头是否包含“邮箱”等列。')
+      alert(t('admin.batchImport.noDataFound'))
     }
   } catch (err: any) {
-    alert('文件解析失败：' + (err.message || '未知错误'))
+    const message = err.response?.data?.error?.message || err.message || t('common.unknown')
+    alert(t('admin.batchImport.parseFailed') + message)
+  } finally {
+    parseLoading.value = false
   }
 
   // Reset input so the same file can be selected again
@@ -196,7 +195,7 @@ const handleSubmit = async () => {
           {
             row: 0,
             email: '',
-            reason: err.response?.data?.error?.message || err.message || '导入失败'
+            reason: err.response?.data?.error?.message || err.message || t('admin.batchImport.importFailed')
           }
         ]
       }
@@ -216,26 +215,28 @@ const handleClose = () => {
     <div v-if="show" class="modal-overlay" @click.self="handleClose">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">批量导入用户</h2>
+          <h2 class="modal-title">{{ $t('admin.batchImport.title') }}</h2>
           <button type="button" class="close-btn" @click="handleClose">&times;</button>
         </div>
 
         <div class="modal-body">
           <p class="hint">
-            在下方表格中直接编辑，或上传 CSV / Excel 文件自动填充。若队员不存在会自动创建，家庭不存在也会自动创建。
+            {{ $t('admin.batchImport.description') }}
           </p>
 
           <div class="toolbar">
-            <label class="file-btn">
+            <label class="file-btn" :class="{ disabled: parseLoading }">
               <input
                 ref="fileInput"
                 type="file"
                 accept=".csv,.tsv,.xlsx,.xls"
+                :disabled="parseLoading"
                 @change="handleFileUpload"
               />
-              上传表格文件
+              <span v-if="parseLoading">{{ $t('common.parsing') }}</span>
+              <span v-else>{{ $t('admin.batchImport.uploadFile') }}</span>
             </label>
-            <button type="button" class="action-btn" @click="addRow">+ 增加一行</button>
+            <button type="button" class="action-btn" @click="addRow">{{ $t('admin.batchImport.addRow') }}</button>
           </div>
 
           <div class="table-wrap">
@@ -243,7 +244,7 @@ const handleClose = () => {
               <thead>
                 <tr>
                   <th v-for="col in COLUMNS" :key="col.key" :class="'col-' + col.key">
-                    {{ col.label }}
+                    {{ $t(col.label) }}
                   </th>
                   <th class="col-action"></th>
                 </tr>
@@ -257,7 +258,7 @@ const handleClose = () => {
                       class="cell-input"
                     >
                       <option v-for="opt in col.options" :key="opt" :value="opt">
-                        {{ opt === '' ? '—' : opt }}
+                        {{ opt === '' ? '—' : col.key === 'role' ? $t('admin.users.roles.' + opt) : col.key === 'team' ? $t('common.team.' + opt.toLowerCase()) : opt }}
                       </option>
                     </select>
                     <input
@@ -265,7 +266,7 @@ const handleClose = () => {
                       v-model="row[col.key]"
                       :type="col.type"
                       class="cell-input"
-                      :placeholder="col.label"
+                      :placeholder="$t(col.label)"
                     />
                   </td>
                   <td class="col-action">
@@ -277,30 +278,29 @@ const handleClose = () => {
           </div>
 
           <div class="preview">
-            已识别 <strong>{{ validRows.length }}</strong> 行有效数据
+            {{ $t('admin.batchImport.validRows', { n: validRows.length }) }}
           </div>
 
           <div v-if="result" class="result" :class="{ ok: result.success, fail: !result.success }">
             <div class="result-title">
-              {{ result.success ? '导入成功' : '导入完成，部分失败' }}
+              {{ result.success ? $t('admin.batchImport.success') : $t('admin.batchImport.partialFailure') }}
             </div>
             <div class="result-stats">
-              总计 {{ result.summary.total }} 行｜成功 {{ result.summary.created }} 个账号｜
-              新建 {{ result.summary.createdMembers }} 名队员｜新建 {{ result.summary.createdFamilies }} 个家庭
+              {{ $t('admin.batchImport.stats', result.summary) }}
             </div>
             <ul v-if="result.summary.failed.length" class="result-failures">
               <li v-for="f in result.summary.failed" :key="f.row + f.email">
-                第 {{ f.row }} 行<span v-if="f.email">（{{ f.email }}）</span>：{{ f.reason }}
+                {{ $t('admin.batchImport.failureRow', { row: f.row, email: f.email, reason: f.reason }) }}
               </li>
             </ul>
           </div>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="editorial-btn secondary" @click="handleClose">取消</button>
-          <button type="button" class="editorial-btn" :disabled="!validRows.length || loading" @click="handleSubmit">
-            <span v-if="loading">导入中...</span>
-            <span v-else>开始导入</span>
+          <button type="button" class="editorial-btn secondary" @click="handleClose">{{ $t('common.cancel') }}</button>
+          <button type="button" class="editorial-btn" :disabled="!validRows.length || loading || parseLoading" @click="handleSubmit">
+            <span v-if="loading">{{ $t('common.importing') }}</span>
+            <span v-else>{{ $t('admin.batchImport.start') }}</span>
           </button>
         </div>
       </div>
@@ -397,13 +397,22 @@ const handleClose = () => {
   transition: all 0.3s ease;
 }
 
-.file-btn:hover {
+.file-btn:hover:not(.disabled) {
   background: var(--text-h);
   color: var(--surface);
 }
 
+.file-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .file-btn input[type='file'] {
   display: none;
+}
+
+.file-btn input[type='file']:disabled {
+  cursor: not-allowed;
 }
 
 .action-btn {

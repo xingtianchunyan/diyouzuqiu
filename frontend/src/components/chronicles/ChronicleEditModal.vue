@@ -19,7 +19,7 @@ const emit = defineEmits<{
   (e: 'updated', chronicle: ChronicleEvent): void
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const membersStore = useMembersStore()
 const mediaStore = useMediaStore()
 const worksStore = useWorksStore()
@@ -56,14 +56,14 @@ const memberOptions = computed(() => [
 
 const photoOptions = computed(() =>
   mediaStore.mediaList.filter(m => m.type === 'PHOTO').map(m => ({
-    label: m.originalFilename || `Photo ${m.id.substring(0, 8)}`,
+    label: m.originalFilename || `${t('media.type.photo')} ${m.id.substring(0, 8)}`,
     value: m.id
   }))
 )
 
 const videoOptions = computed(() =>
   mediaStore.mediaList.filter(m => m.type === 'VIDEO').map(m => ({
-    label: m.originalFilename || `Video ${m.id.substring(0, 8)}`,
+    label: m.originalFilename || `${t('media.type.video')} ${m.id.substring(0, 8)}`,
     value: m.id
   }))
 )
@@ -84,7 +84,11 @@ const poemOptions = computed(() =>
 
 const matchOptions = computed(() =>
   matchesStore.matches.map(m => ({
-    label: `${new Date(m.playedAt).toLocaleDateString()} - Red ${m.redScore}:${m.blueScore} Blue`,
+    label: t('matches.optionLabel', {
+      date: new Date(m.playedAt).toLocaleDateString(locale.value),
+      redScore: m.redScore,
+      blueScore: m.blueScore
+    }),
     value: m.id
   }))
 )
@@ -112,7 +116,7 @@ watch(() => props.chronicle, (chronicle) => {
 const handleSubmit = async () => {
   if (!props.chronicle) return
   if (!form.value.title || !form.value.happenedAt) {
-    error.value = 'Title and date are required'
+    error.value = t('errors.chronicleRequiredFields')
     return
   }
   loading.value = true
@@ -131,7 +135,7 @@ const handleSubmit = async () => {
     emit('updated', res.data as ChronicleEvent)
     emit('close')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update chronicle'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.updateChronicleFailed')
   } finally {
     loading.value = false
   }
@@ -143,7 +147,7 @@ const handleSubmit = async () => {
     <div v-if="chronicle" class="modal-overlay" @click="emit('close')">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ t('chronicles.editTitle') || 'Edit Chronicle' }}</h2>
+          <h2 class="modal-title">{{ t('chronicles.editTitle') }}</h2>
           <button class="close-btn" @click="emit('close')">&times;</button>
         </div>
 
@@ -151,57 +155,57 @@ const handleSubmit = async () => {
 
         <form @submit.prevent="handleSubmit" class="editorial-form">
           <div class="form-group">
-            <label class="form-label">TITLE *</label>
+            <label class="form-label">{{ t('chronicles.form.title') }}</label>
             <input v-model="form.title" type="text" class="form-input" required />
           </div>
 
           <div class="form-group">
-            <label class="form-label">HAPPENED AT *</label>
+            <label class="form-label">{{ t('chronicles.form.happenedAt') }}</label>
             <input v-model="form.happenedAt" type="date" class="form-input" required />
           </div>
 
           <div class="form-group">
-            <label class="form-label">DESCRIPTION</label>
-            <MarkdownEditor v-model="form.description" placeholder="输入纪事描述..." :rows="6" />
+            <label class="form-label">{{ t('chronicles.form.description') }}</label>
+            <MarkdownEditor v-model="form.description" :placeholder="t('chronicles.form.descriptionPlaceholder')" :rows="6" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED MEMBERS</label>
-            <OrganicDropdown v-model="form.memberIds" :options="memberOptions" :multiple="true" placeholder="Select members..." />
+            <label class="form-label">{{ t('chronicles.form.members') }}</label>
+            <OrganicDropdown v-model="form.memberIds" :options="memberOptions" :multiple="true" :placeholder="t('chronicles.form.selectMembers')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED PHOTOS</label>
-            <OrganicDropdown v-model="form.photoIds" :options="photoOptions" :multiple="true" placeholder="Select photos..." />
+            <label class="form-label">{{ t('chronicles.form.photos') }}</label>
+            <OrganicDropdown v-model="form.photoIds" :options="photoOptions" :multiple="true" :placeholder="t('chronicles.form.selectPhotos')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED VIDEOS</label>
-            <OrganicDropdown v-model="form.videoIds" :options="videoOptions" :multiple="true" placeholder="Select videos..." />
+            <label class="form-label">{{ t('chronicles.form.videos') }}</label>
+            <OrganicDropdown v-model="form.videoIds" :options="videoOptions" :multiple="true" :placeholder="t('chronicles.form.selectVideos')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED ARTICLES</label>
-            <OrganicDropdown v-model="form.articleIds" :options="articleOptions" :multiple="true" placeholder="Select articles..." />
+            <label class="form-label">{{ t('chronicles.form.articles') }}</label>
+            <OrganicDropdown v-model="form.articleIds" :options="articleOptions" :multiple="true" :placeholder="t('chronicles.form.selectArticles')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED POEMS</label>
-            <OrganicDropdown v-model="form.poemIds" :options="poemOptions" :multiple="true" placeholder="Select poems..." />
+            <label class="form-label">{{ t('chronicles.form.poems') }}</label>
+            <OrganicDropdown v-model="form.poemIds" :options="poemOptions" :multiple="true" :placeholder="t('chronicles.form.selectPoems')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">ASSOCIATED MATCHES</label>
-            <OrganicDropdown v-model="form.matchIds" :options="matchOptions" :multiple="true" placeholder="Select matches..." />
+            <label class="form-label">{{ t('chronicles.form.matches') }}</label>
+            <OrganicDropdown v-model="form.matchIds" :options="matchOptions" :multiple="true" :placeholder="t('chronicles.form.selectMatches')" />
           </div>
 
           <div class="form-actions">
             <button type="button" class="editorial-btn secondary" @click="emit('close')">
-              {{ t('common.cancel') || 'Cancel' }}
+              {{ t('common.cancel') }}
             </button>
             <button type="submit" class="editorial-btn" :disabled="loading">
               <span v-if="loading">...</span>
-              <span v-else>{{ t('common.save') || 'Save' }}</span>
+              <span v-else>{{ t('common.save') }}</span>
             </button>
           </div>
         </form>

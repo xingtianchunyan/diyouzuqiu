@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import { saveMediaFile, getAbsoluteStoragePath } from '../../lib/storage.js'
+import { validateBody, z } from '../../lib/validate.js'
 import fs from 'fs'
 import path from 'path'
 
@@ -17,6 +18,33 @@ function isAllowedFile(filename: string, mimetype: string): boolean {
   if (!ALLOWED_EXTS.includes(ext)) return false
   if (!ALLOWED_MEDIA_TYPES.includes(mimetype)) return false
   return true
+}
+
+const mediaMetaSchema = z.object({
+  takenAt: z.string().datetime().optional(),
+  year: z.number().int().optional(),
+  personTagIds: z.array(z.string()).max(100).optional()
+})
+
+const updateMediaSchema = z.object({
+  takenAt: z.string().datetime().optional().nullable(),
+  year: z.number().int().optional().nullable(),
+  personTagIds: z.array(z.string()).max(100).optional()
+})
+
+const PHOTO_MAX_SIZE = 20 * 1024 * 1024
+const VIDEO_MAX_SIZE = 100 * 1024 * 1024
+
+function canAccessMedia(
+  media: { createdByUserId: string | null; personTags: { memberId: string }[] },
+  user: { role: string; id: string; memberId: string | null }
+): boolean {
+  if (user.role === 'ADMIN') return true
+  if (media.createdByUserId === user.id) return true
+  if (user.memberId && media.personTags.length === 1 && media.personTags[0].memberId === user.memberId) {
+    return true
+  }
+  return false
 }
 
 export const mediaRoutes: FastifyPluginAsync = async (app) => {
@@ -36,26 +64,31 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       })
     }
 
+    const ext = path.extname(data.filename).toLowerCase()
+    const isVideo = VIDEO_EXTS.includes(ext)
+    const maxSize = isVideo ? VIDEO_MAX_SIZE : PHOTO_MAX_SIZE
+    let type: string = isVideo ? 'VIDEO' : 'PHOTO'
+
     // Try to get metadata from fields if any
-    let meta: any = {}
+    let rawMeta: any = {}
     if (data.fields.meta && 'value' in data.fields.meta) {
       try {
-        meta = JSON.parse(data.fields.meta.value as string)
+        rawMeta = JSON.parse(data.fields.meta.value as string)
       } catch (err) {
         return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Invalid meta JSON' } })
       }
     }
 
+    const metaResult = mediaMetaSchema.safeParse(rawMeta)
+    if (!metaResult.success) {
+      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'Invalid meta fields', details: metaResult.error.issues } })
+    }
+    const meta = metaResult.data
+
     const takenAt = meta.takenAt ? new Date(meta.takenAt) : null
-    const year = meta.year || (takenAt ? takenAt.getFullYear() : new Date().getFullYear())
+    const year = meta.year ?? (takenAt ? takenAt.getFullYear() : new Date().getFullYear())
     const month = takenAt ? takenAt.getMonth() + 1 : new Date().getMonth() + 1
     const personTagIds: string[] = meta.personTagIds || []
-
-    const ext = path.extname(data.filename).toLowerCase()
-    let type: string = 'PHOTO'
-    if (VIDEO_EXTS.includes(ext)) {
-      type = 'VIDEO'
-    }
 
     const mimeType = data.mimetype
 
@@ -77,6 +110,18 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     try {
       // 2. Save file
       const { storagePath, sha256, sizeBytes } = await saveMediaFile(data, media.id, year, month)
+
+      if (sizeBytes > maxSize) {
+        const absPath = getAbsoluteStoragePath(storagePath)
+        if (fs.existsSync(absPath)) fs.unlinkSync(absPath)
+        await prisma.mediaAsset.delete({ where: { id: media.id } }).catch(() => {})
+        return reply.code(400).send({
+          error: {
+            code: 'FILE_TOO_LARGE',
+            message: `File exceeds maximum size of ${maxSize / 1024 / 1024}MB`
+          }
+        })
+      }
 
       // 3. Update DB record
       await prisma.mediaAsset.update({
@@ -100,7 +145,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.get('/media', async (request, reply) => {
+  app.get('/media', { preValidation: [app.authenticate] }, async (request, reply) => {
     const query = request.query as { type?: string; year?: string; personId?: string }
     const where: any = {}
 
@@ -168,7 +213,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }))
   })
 
-  app.get('/media/:id', async (request, reply) => {
+  app.get('/media/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const media = await prisma.mediaAsset.findUnique({
       where: { id },
@@ -181,6 +226,10 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
 
     if (!media) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Media not found' } })
+    }
+
+    if (!canAccessMedia(media, request.user)) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You do not have permission to view this media' } })
     }
 
     return {
@@ -196,9 +245,9 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.put('/media/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
+  app.put('/media/:id', { preValidation: [app.authenticate, validateBody(updateMediaSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const body = request.body as { takenAt?: string | null; year?: number | null; personTagIds?: string[] }
+    const body = (request as any).validatedBody as { takenAt?: string | null; year?: number | null; personTagIds?: string[] }
     const user = request.user
 
     const media = await prisma.mediaAsset.findUnique({
@@ -261,12 +310,19 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.get('/media/:id/file', async (request, reply) => {
+  app.get('/media/:id/file', { preValidation: [app.authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const media = await prisma.mediaAsset.findUnique({ where: { id } })
-    
+    const media = await prisma.mediaAsset.findUnique({
+      where: { id },
+      include: { personTags: true }
+    })
+
     if (!media || !media.storagePath) {
       return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'File not found' } })
+    }
+
+    if (!canAccessMedia(media, request.user)) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You do not have permission to view this file' } })
     }
 
     return reply.sendFile(media.storagePath)

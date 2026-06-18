@@ -42,7 +42,7 @@ const fetchWork = async () => {
     const res = await worksService.getWorkDetail(id.value)
     work.value = res.data
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to load work'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.loadWorkFailed')
   } finally {
     loading.value = false
   }
@@ -50,12 +50,12 @@ const fetchWork = async () => {
 
 const handleDelete = async () => {
   if (!work.value) return
-  if (confirm('确认删除该作品吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteWork'))) {
     try {
       await worksService.deleteWork(work.value.id)
       router.push('/works')
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete work')
+      alert(err.response?.data?.error?.message || t('errors.deleteWorkFailed'))
     }
   }
 }
@@ -74,7 +74,7 @@ watch(id, fetchWork)
 
     <div v-if="loading" class="loading-state delay-2 animate-slide-up">
       <div class="spinner"></div>
-      <span>Loading...</span>
+      <span>{{ t('common.loading') }}</span>
     </div>
 
     <div v-else-if="error" class="error-state delay-2 animate-slide-up">
@@ -83,17 +83,17 @@ watch(id, fetchWork)
 
     <article v-else-if="work" class="work-article delay-2 animate-slide-up">
       <header class="article-header">
-        <div class="article-type">{{ work.type === 'ARTICLE' ? t('works.articles', 'Article') : t('works.poems', 'Poem') }}</div>
+        <div class="article-type">{{ work.type === 'ARTICLE' ? t('works.articles') : t('works.poems') }}</div>
         <h1 class="article-title">{{ work.title }}</h1>
         <div v-if="metaLine" class="article-meta">{{ metaLine }}</div>
         <div class="article-actions">
-          <button v-if="canDeleteWork(work)" class="minimal-btn" @click="handleDelete">删除</button>
+          <button v-if="canDeleteWork(work)" class="minimal-btn" @click="handleDelete">{{ t('common.delete') }}</button>
         </div>
       </header>
 
       <div class="article-body">
         <MarkdownRenderer :markdown="work.content || ''" />
-        <p v-if="!work.content" class="article-paragraph article-empty">No content.</p>
+        <p v-if="!work.content" class="article-paragraph article-empty">{{ t('works.noContent') }}</p>
       </div>
     </article>
   </main>

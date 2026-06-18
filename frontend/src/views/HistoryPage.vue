@@ -58,7 +58,7 @@ const handleSelect = (year: number) => {
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">THE TIMELINE</div>
+      <div class="label-micro delay-1 animate-slide-up">{{ t('history.kicker') }}</div>
       <h1 class="editorial-title delay-2 animate-slide-up">{{ t('app.menu.history') }}</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
         <p class="editorial-subtitle">{{ t('home.nav.historyDesc') }}</p>
@@ -68,7 +68,7 @@ const handleSelect = (year: number) => {
             class="action-btn" 
             @click="addFutureYear"
           >
-            + 未来
+            {{ t('history.futureButton') }}
           </button>
           <button class="action-btn" @click="router.push('/upload?tab=CHRONICLE')">
             + {{ t('app.menu.upload') }}

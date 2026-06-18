@@ -1,12 +1,25 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { validateBody, z } from '../../lib/validate.js'
 import { validatePassword } from '../../lib/password.js'
+import { clearFailures, createCaptcha, failureCount, recordFailure, requiresCaptcha, verifyCaptcha } from '../../lib/login-attempts.js'
+import { createOtp, verifyOtp } from '../../lib/otp/store.js'
+import { createOtpSender } from '../../lib/otp/sender.js'
+
+const TOKEN_COOKIE_NAME = 'token'
+const TOKEN_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+
+function isProduction() {
+  return process.env.NODE_ENV === 'production'
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1)
+  password: z.string().min(1),
+  captchaId: z.string().optional(),
+  captchaAnswer: z.string().optional()
 })
 
 const changePasswordSchema = z.object({
@@ -14,81 +27,155 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(8)
 })
 
+const otpSendSchema = z.object({
+  email: z.string().email()
+})
+
+const otpLoginSchema = z.object({
+  email: z.string().email(),
+  codeId: z.string().min(1),
+  code: z.string().length(6)
+})
+
+const otpSender = createOtpSender()
+
+function signUserToken(app: any, user: { id: string; role: string; email: string; memberId: string | null; tokenVersion: number }) {
+  return app.jwt.sign({
+    id: user.id,
+    role: user.role,
+    email: user.email,
+    memberId: user.memberId,
+    tokenVersion: user.tokenVersion
+  })
+}
+
+function setTokenCookie(reply: any, token: string) {
+  reply.setCookie(TOKEN_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: 'strict',
+    path: '/',
+    maxAge: TOKEN_MAX_AGE_MS
+  })
+}
+
+async function buildLoginResponse(
+  app: any,
+  reply: any,
+  user: { id: string; role: string; email: string; phone: string | null; memberId: string | null; tokenVersion: number }
+) {
+  const token = signUserToken(app, user)
+  setTokenCookie(reply, token)
+  return {
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      memberId: user.memberId
+    }
+  }
+}
+
 export const authRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/auth/captcha', async (request, reply) => {
+    const captcha = createCaptcha()
+    return {
+      id: captcha.id,
+      question: captcha.question
+    }
+  })
+
   app.post('/auth/login', {
     preValidation: validateBody(loginSchema),
     config: {
       rateLimit: {
-        max: 10,
+        max: 5,
         timeWindow: '1 minute'
       }
     }
   }, async (request, reply) => {
-    const { email, password } = (request as any).validatedBody as { email: string; password: string }
+    const ip = request.ip
+    const { email, password, captchaId, captchaAnswer } = (request as any).validatedBody as {
+      email: string
+      password: string
+      captchaId?: string
+      captchaAnswer?: string
+    }
+
+    if (requiresCaptcha(ip)) {
+      if (!verifyCaptcha(captchaId, captchaAnswer)) {
+        return reply.code(403).send({
+          error: {
+            code: 'CAPTCHA_REQUIRED',
+            message: 'Captcha required after repeated failed login attempts',
+            failures: failureCount(ip)
+          }
+        })
+      }
+    }
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
-      return reply.code(401).send({ message: 'Invalid credentials' })
+      recordFailure(ip)
+      return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' } })
     }
 
     const isValid = await bcrypt.compare(password, user.password)
     if (!isValid) {
-      return reply.code(401).send({ message: 'Invalid credentials' })
+      recordFailure(ip)
+      return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' } })
     }
 
-    const token = app.jwt.sign({ id: user.id, role: user.role, email: user.email, memberId: user.memberId })
-    // Return token and basic user info
-    return {
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        memberId: user.memberId
-      }
-    }
+    clearFailures(ip)
+    return buildLoginResponse(app, reply, user)
   })
 
-  // Refresh token endpoint
   app.post('/auth/refresh', async (request, reply) => {
     const auth = request.headers.authorization || ''
     if (!auth.startsWith('Bearer ')) {
-      return reply.code(401).send({ message: 'No Authorization was found in request.headers' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'No Authorization header' } })
     }
 
     const rawToken = auth.slice('Bearer '.length).trim()
     let payload: any
     try {
-      payload = app.jwt.verify(rawToken, { ignoreExpiration: true })
+      payload = app.jwt.verify(rawToken)
     } catch (err) {
-      return reply.code(401).send({ message: 'Invalid token' })
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } })
     }
 
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, email: true, role: true, memberId: true }
+      select: { id: true, email: true, phone: true, role: true, memberId: true, tokenVersion: true }
     })
-    if (!user) {
-      return reply.code(401).send({ message: 'Invalid credentials' })
+    if (!user || user.tokenVersion !== payload.tokenVersion) {
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid or revoked token' } })
     }
 
-    const token = app.jwt.sign({ id: user.id, role: user.role, email: user.email, memberId: user.memberId })
+    const token = signUserToken(app, user)
+    setTokenCookie(reply, token)
     return { token }
   })
 
-  // Logout (client-side deletes token, but we can provide an empty endpoint or blacklist if needed)
   app.post('/auth/logout', { preValidation: [app.authenticate] }, async (request, reply) => {
+    await prisma.user.update({
+      where: { id: request.user.id },
+      data: { tokenVersion: { increment: 1 } }
+    })
+    reply.clearCookie(TOKEN_COOKIE_NAME, { path: '/' })
     return { message: 'Logged out successfully' }
   })
 
   app.get('/me', { preValidation: [app.authenticate] }, async (request, reply) => {
     const user = await prisma.user.findUnique({
       where: { id: request.user.id },
-      select: { id: true, email: true, role: true, memberId: true }
+      select: { id: true, email: true, phone: true, role: true, memberId: true }
     })
 
     if (!user) {
-      return reply.code(404).send({ message: 'User not found' })
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'User not found' } })
     }
 
     return user
@@ -120,9 +207,66 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10)
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword, tokenVersion: { increment: 1 } }
     })
 
     return { message: 'Password changed successfully' }
+  })
+
+  app.post('/auth/otp/send', {
+    preValidation: validateBody(otpSendSchema),
+    config: {
+      rateLimit: {
+        max: 3,
+        timeWindow: '10 minutes'
+      }
+    }
+  }, async (request, reply) => {
+    const { email } = (request as any).validatedBody as { email: string }
+    const { id, code, expiresIn } = createOtp('email', email)
+
+    try {
+      await otpSender.send({ type: 'email', target: email, code })
+    } catch (err: any) {
+      request.log.error({ err }, 'Failed to send OTP')
+      return reply.code(500).send({ error: { code: 'SEND_FAILED', message: 'Failed to send verification code' } })
+    }
+
+    // In non-production environments we return the code to facilitate testing.
+    // In production the code is only delivered via the configured channel.
+    if (isProduction()) {
+      return { codeId: id, expiresIn }
+    }
+    return { codeId: id, code, expiresIn }
+  })
+
+  app.post('/auth/otp/login', {
+    preValidation: validateBody(otpLoginSchema)
+  }, async (request, reply) => {
+    const { email, codeId, code } = (request as any).validatedBody as {
+      email: string
+      codeId: string
+      code: string
+    }
+
+    if (!verifyOtp(codeId, email, code)) {
+      return reply.code(401).send({ error: { code: 'INVALID_OTP', message: 'Invalid or expired verification code' } })
+    }
+
+    let user = await prisma.user.findUnique({ where: { email } })
+
+    if (!user) {
+      // Auto-register new users via email OTP
+      const randomPassword = await bcrypt.hash(crypto.randomUUID(), 10)
+      user = await prisma.user.create({
+        data: {
+          email,
+          password: randomPassword,
+          role: 'MEMBER'
+        }
+      })
+    }
+
+    return buildLoginResponse(app, reply, user)
   })
 }

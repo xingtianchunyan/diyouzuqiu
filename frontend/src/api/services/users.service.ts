@@ -25,6 +25,13 @@ export const usersService = {
       failed: Array<{ row: number; email: string; reason: string }>
     } }>('/admin/users/batch', data)
   },
+  parseExcel(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<{ rows: string[][] }>('/admin/users/parse-excel', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
   updateUser(id: string, data: any) {
     return apiClient.put<User>(`/admin/users/${id}`, data)
   },

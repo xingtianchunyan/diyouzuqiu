@@ -20,7 +20,7 @@ const groupedWorks = computed(() => {
   const groups: Record<string, Work[]> = {}
   
   props.worksList.forEach((work) => {
-    let label = 'Unknown Date'
+    let label = t('common.unknownDate')
     if (work.date) {
       label = work.date.substring(0, 7)
     } else if (work.year) {
@@ -43,10 +43,10 @@ const groupedWorks = computed(() => {
 const formatGroupLabel = (label: string) => {
   if (/^\d{4}-\d{2}$/.test(label)) {
     const [y, m] = label.split('-')
-    return `${y}年${parseInt(m, 10)}月`
+    return `${y}${t('common.date.yearSuffix')}${parseInt(m, 10)}${t('common.date.monthSuffix')}`
   }
   if (/^\d{4}$/.test(label)) {
-    return `${label}年`
+    return `${label}${t('common.date.yearSuffix')}`
   }
   return label
 }
@@ -54,7 +54,7 @@ const formatGroupLabel = (label: string) => {
 
 <template>
   <div v-if="groupedWorks.length === 0" class="empty-archive">
-    <p class="empty-text">{{ t('works.noWorks', 'No works found matching your criteria.') }}</p>
+    <p class="empty-text">{{ t('works.noWorks') }}</p>
   </div>
 
   <div v-else class="works-list">
@@ -68,17 +68,17 @@ const formatGroupLabel = (label: string) => {
           @click="emit('select', work.id)"
         >
           <div class="work-meta">
-            <span class="work-type">{{ work.type === 'ARTICLE' ? t('works.articles', 'Article') : t('works.poems', 'Poem') }}</span>
+            <span class="work-type">{{ work.type === 'ARTICLE' ? t('works.articles') : t('works.poems') }}</span>
             <span v-if="work.year" class="work-year">{{ work.year }}</span>
           </div>
           <div class="work-details">
             <h3 class="work-title">{{ work.title }}</h3>
-            <p class="work-author" v-if="work.authorMember">AUTHOR: {{ work.authorMember.displayName }}</p>
-            <p class="work-author" v-else-if="work.authorName">AUTHOR: {{ work.authorName }}</p>
-            <p class="work-author" v-else-if="work.authorMemberId">AUTHOR ID: {{ work.authorMemberId }}</p>
+            <p class="work-author" v-if="work.authorMember">{{ t('works.authorLabel') }}{{ work.authorMember.displayName }}</p>
+            <p class="work-author" v-else-if="work.authorName">{{ t('works.authorLabel') }}{{ work.authorName }}</p>
+            <p class="work-author" v-else-if="work.authorMemberId">{{ t('works.authorIdLabel') }}{{ work.authorMemberId }}</p>
           </div>
           <div class="work-actions" v-if="props.canDelete && props.canDelete(work)">
-            <button class="delete-btn" @click.stop="emit('delete', work)" title="Delete">×</button>
+            <button class="delete-btn" @click.stop="emit('delete', work)" :title="t('common.delete')">×</button>
           </div>
         </div>
       </div>

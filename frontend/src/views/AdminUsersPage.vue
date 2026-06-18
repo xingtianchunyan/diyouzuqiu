@@ -1,16 +1,16 @@
 <template>
   <main class="editorial-container animate-fade-in">
     <div class="editorial-header">
-      <div class="label-micro delay-1 animate-slide-up">ADMIN</div>
-      <h1 class="editorial-title delay-2 animate-slide-up">账号管理</h1>
+      <div class="label-micro delay-1 animate-slide-up">{{ $t('admin.kicker') }}</div>
+      <h1 class="editorial-title delay-2 animate-slide-up">{{ $t('admin.title') }}</h1>
       <div class="subtitle-row delay-3 animate-slide-up">
-        <p class="editorial-subtitle">管理所有登录用户及其关联的队员身份</p>
+        <p class="editorial-subtitle">{{ $t('admin.subtitle') }}</p>
         <div class="header-actions">
           <button class="action-btn" @click="openBatchModal">
-            批量导入
+            {{ $t('admin.batchImport.title') }}
           </button>
           <button class="action-btn" @click="openModal()">
-            + 添加用户
+            {{ $t('admin.addUser') }}
           </button>
         </div>
       </div>
@@ -20,20 +20,20 @@
       <table class="users-table">
         <thead>
           <tr>
-            <th>Email</th>
-            <th>角色</th>
-            <th>关联队员</th>
-            <th>操作</th>
+            <th>{{ $t('admin.users.email') }}</th>
+            <th>{{ $t('admin.users.role') }}</th>
+            <th>{{ $t('admin.users.linkedMember') }}</th>
+            <th>{{ $t('admin.users.actions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="u in users" :key="u.id">
             <td>{{ u.email }}</td>
-            <td>{{ u.role }}</td>
-            <td>{{ u.member?.displayName || '未绑定' }}</td>
+            <td>{{ $t('admin.users.roles.' + u.role) }}</td>
+            <td>{{ u.member?.displayName || $t('admin.users.unbound') }}</td>
             <td>
-              <button class="btn-text" @click="openModal(u)">编辑</button>
-              <button class="btn-text danger" @click="handleDelete(u.id)" v-if="u.id !== authStore.user?.id">删除</button>
+              <button class="btn-text" @click="openModal(u)">{{ $t('common.edit') }}</button>
+              <button class="btn-text danger" @click="handleDelete(u.id)" v-if="u.id !== authStore.user?.id">{{ $t('common.delete') }}</button>
             </td>
           </tr>
         </tbody>
@@ -45,37 +45,37 @@
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal-content" @click.stop>
           <div class="modal-header">
-            <h2 class="modal-title">{{ editingUser ? '编辑用户' : '新增用户' }}</h2>
+            <h2 class="modal-title">{{ editingUser ? $t('admin.users.editUser') : $t('admin.users.newUser') }}</h2>
             <button type="button" class="close-btn" @click="closeModal">&times;</button>
           </div>
 
           <form @submit.prevent="handleSubmit" class="editorial-form">
             <div class="form-group">
-              <label class="form-label">邮箱</label>
+              <label class="form-label">{{ $t('admin.users.email') }}</label>
               <input v-model="form.email" type="email" class="form-input" required />
             </div>
             <div class="form-group">
-              <label class="form-label">密码</label>
-              <input v-model="form.password" type="password" class="form-input" :placeholder="editingUser ? '留空表示不修改' : '必填'" :required="!editingUser" />
+              <label class="form-label">{{ $t('auth.password') }}</label>
+              <input v-model="form.password" type="password" class="form-input" :placeholder="editingUser ? $t('admin.users.passwordPlaceholderEdit') : $t('admin.users.passwordPlaceholderNew')" :required="!editingUser" />
             </div>
             <div class="form-group">
-              <label class="form-label">角色</label>
+              <label class="form-label">{{ $t('admin.users.role') }}</label>
               <select v-model="form.role" class="form-input">
-                <option value="MEMBER">MEMBER</option>
-                <option value="ADMIN">ADMIN</option>
+                <option value="MEMBER">{{ $t('admin.users.roles.MEMBER') }}</option>
+                <option value="ADMIN">{{ $t('admin.users.roles.ADMIN') }}</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">绑定队员</label>
+              <label class="form-label">{{ $t('admin.users.linkMember') }}</label>
               <select v-model="form.memberId" class="form-input">
-                <option value="">-- 不绑定 --</option>
+                <option value="">{{ $t('admin.users.noLink') }}</option>
                 <option v-for="m in members" :key="m.id" :value="m.id">{{ m.displayName }}</option>
               </select>
             </div>
 
             <div class="form-actions">
-              <button type="button" class="editorial-btn secondary" @click="closeModal">取消</button>
-              <button type="submit" class="editorial-btn">保存</button>
+              <button type="button" class="editorial-btn secondary" @click="closeModal">{{ $t('common.cancel') }}</button>
+              <button type="submit" class="editorial-btn">{{ $t('common.save') }}</button>
             </div>
           </form>
         </div>
@@ -92,11 +92,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usersService, type User } from '../api/services/users.service'
 import { membersService, type Member } from '../api/services/members.service'
 import { useAuthStore } from '../stores/auth'
 import BatchUserImportModal from '../components/users/BatchUserImportModal.vue'
 
+const { t } = useI18n()
 const authStore = useAuthStore()
 const loading = ref(true)
 const users = ref<User[]>([])
@@ -189,17 +191,17 @@ const handleSubmit = async () => {
     closeModal()
     loadData()
   } catch (err: any) {
-    alert(err.response?.data?.error?.message || 'Error saving user')
+    alert(err.response?.data?.error?.message || t('errors.saveUserFailed'))
   }
 }
 
 const handleDelete = async (id: string) => {
-  if (confirm('确认删除此用户？')) {
+  if (confirm(t('confirm.deleteUser'))) {
     try {
       await usersService.deleteUser(id)
       loadData()
     } catch (err: any) {
-      alert('Error deleting user')
+      alert(t('errors.deleteUserFailed'))
     }
   }
 }

@@ -49,7 +49,8 @@ describe('Works API', () => {
   it('GET /api/v1/works/:id returns the work', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/works/${workId}`
+      url: `/api/v1/works/${workId}`,
+      headers: { authorization: `Bearer ${token}` }
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().title).toBe('Test Article')

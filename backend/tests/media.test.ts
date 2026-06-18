@@ -83,4 +83,21 @@ describe('Media API', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json().id).toBe(mediaId)
   })
+
+  it('GET /api/v1/media/:id/file requires authentication', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/media/${mediaId}/file`
+    })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('GET /api/v1/media/:id/file allows admin to access', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/media/${mediaId}/file`,
+      headers: { authorization: `Bearer ${token}` }
+    })
+    expect(res.statusCode).toBe(200)
+  })
 })

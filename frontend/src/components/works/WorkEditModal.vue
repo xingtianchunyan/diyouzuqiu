@@ -38,13 +38,13 @@ const form = ref<{
   content: ''
 })
 
-const typeOptions = [
-  { label: 'Article', value: 'ARTICLE' },
-  { label: 'Poem', value: 'POEM' }
-]
+const typeOptions = computed(() => [
+  { label: t('works.articles'), value: 'ARTICLE' },
+  { label: t('works.poems'), value: 'POEM' }
+])
 
 const memberOptions = computed(() => [
-  { label: 'Unknown/None', value: '' },
+  { label: t('works.form.unknownAuthor'), value: '' },
   ...membersStore.members.map(m => ({ label: m.displayName, value: m.id }))
 ])
 
@@ -65,7 +65,7 @@ watch(() => props.work, (work) => {
 const handleSubmit = async () => {
   if (!props.work) return
   if (!form.value.title || !form.value.content || !form.value.date) {
-    error.value = 'Title, date and content are required'
+    error.value = t('errors.workRequiredFields')
     return
   }
   loading.value = true
@@ -83,7 +83,7 @@ const handleSubmit = async () => {
     emit('updated', res.data)
     emit('close')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update work'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.updateWorkFailed')
   } finally {
     loading.value = false
   }
@@ -95,7 +95,7 @@ const handleSubmit = async () => {
     <div v-if="work" class="modal-overlay" @click="emit('close')">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ t('works.editTitle') || 'Edit Work' }}</h2>
+          <h2 class="modal-title">{{ t('works.editTitle') }}</h2>
           <button class="close-btn" @click="emit('close')">&times;</button>
         </div>
 
@@ -103,45 +103,45 @@ const handleSubmit = async () => {
 
         <form @submit.prevent="handleSubmit" class="editorial-form">
           <div class="form-group">
-            <label class="form-label">TYPE *</label>
+            <label class="form-label">{{ t('works.form.type') }}</label>
             <OrganicToggle v-model="form.type" :options="typeOptions" />
           </div>
           <div class="form-group">
-            <label class="form-label">TITLE *</label>
+            <label class="form-label">{{ t('works.form.title') }}</label>
             <input v-model="form.title" type="text" class="form-input" required />
           </div>
           <div class="form-group">
-            <label class="form-label">AUTHOR</label>
+            <label class="form-label">{{ t('works.form.author') }}</label>
             <OrganicDropdown
               v-model="form.authorId"
               :options="memberOptions"
-              placeholder="选择已有队员"
+              :placeholder="t('works.form.selectAuthor')"
               @change="form.authorName = ''"
             />
             <input
               v-model="form.authorName"
               type="text"
               class="form-input author-name-input"
-              placeholder="或输入新作者名"
+              :placeholder="t('works.form.orNewAuthor')"
               @input="form.authorId = ''"
             />
           </div>
           <div class="form-group">
-            <label class="form-label">DATE *</label>
+            <label class="form-label">{{ t('works.form.date') }}</label>
             <input v-model="form.date" type="date" class="form-input" required />
           </div>
           <div class="form-group">
-            <label class="form-label">CONTENT *</label>
-            <MarkdownEditor v-model="form.content" placeholder="输入文章正文..." />
+            <label class="form-label">{{ t('works.form.content') }}</label>
+            <MarkdownEditor v-model="form.content" :placeholder="t('works.form.contentPlaceholder')" />
           </div>
 
           <div class="form-actions">
             <button type="button" class="editorial-btn secondary" @click="emit('close')">
-              {{ t('common.cancel') || 'Cancel' }}
+              {{ t('common.cancel') }}
             </button>
             <button type="submit" class="editorial-btn" :disabled="loading">
-              <span v-if="loading">...</span>
-              <span v-else>{{ t('common.save') || 'Save' }}</span>
+              <span v-if="loading">{{ t('common.saving') }}</span>
+              <span v-else>{{ t('common.save') }}</span>
             </button>
           </div>
         </form>

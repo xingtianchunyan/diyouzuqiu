@@ -69,7 +69,7 @@ const handleSubmit = async () => {
     emit('updated', res.data)
     emit('close')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update media'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.updateMediaFailed')
   } finally {
     loading.value = false
   }
@@ -81,35 +81,35 @@ const handleSubmit = async () => {
     <div v-if="media" class="modal-overlay" @click="emit('close')">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ t('media.editTitle') || 'Edit Media' }}</h2>
-          <button class="close-btn" @click="emit('close')" aria-label="Close">&times;</button>
+          <h2 class="modal-title">{{ t('media.editTitle') }}</h2>
+          <button class="close-btn" @click="emit('close')" :aria-label="$t('common.close')">&times;</button>
         </div>
 
         <div v-if="error" class="alert alert-error">{{ error }}</div>
 
         <form @submit.prevent="handleSubmit" class="editorial-form">
           <div class="form-group">
-            <label class="form-label">{{ t('upload.takenAt') || 'TAKEN AT' }}</label>
+            <label class="form-label">{{ t('media.form.takenAt') }}</label>
             <input v-model="form.takenAt" type="datetime-local" class="form-input" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">{{ t('upload.year') || 'YEAR' }}</label>
-            <input v-model.number="form.year" type="number" class="form-input" placeholder="YYYY" />
+            <label class="form-label">{{ t('media.form.year') }}</label>
+            <input v-model.number="form.year" type="number" class="form-input" :placeholder="$t('media.form.yearPlaceholder')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">{{ t('upload.personTags') || 'SUBJECT TAGS' }}</label>
-            <OrganicDropdown v-model="form.personTagIds" :options="memberOptions" :multiple="true" placeholder="Select tags..." />
+            <label class="form-label">{{ t('media.form.personTags') }}</label>
+            <OrganicDropdown v-model="form.personTagIds" :options="memberOptions" :multiple="true" :placeholder="$t('media.form.selectTags')" />
           </div>
 
           <div class="form-actions">
             <button type="button" class="editorial-btn secondary" @click="emit('close')">
-              {{ t('common.cancel') || 'Cancel' }}
+              {{ t('common.cancel') }}
             </button>
             <button type="submit" class="editorial-btn" :disabled="loading">
-              <span v-if="loading">...</span>
-              <span v-else>{{ t('common.save') || 'Save' }}</span>
+              <span v-if="loading">{{ $t('common.saving') }}</span>
+              <span v-else>{{ t('common.save') }}</span>
             </button>
           </div>
         </form>

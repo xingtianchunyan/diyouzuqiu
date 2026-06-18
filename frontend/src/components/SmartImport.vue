@@ -1,8 +1,8 @@
 <template>
   <div class="smart-import-panel">
     <div class="import-header">
-      <h3>智能导入</h3>
-      <p class="import-desc">支持微信公众号链接、网页链接、粘贴网页源码或上传文档自动提取正文</p>
+      <h3>{{ t('upload.smartImport.title') }}</h3>
+      <p class="import-desc">{{ t('upload.smartImport.description') }}</p>
     </div>
 
     <div class="import-tabs">
@@ -26,7 +26,7 @@
             type="url"
             v-model="url"
             class="form-input"
-            placeholder="https://mp.weixin.qq.com/s/... 或任意网页链接"
+            :placeholder="t('upload.smartImport.urlPlaceholder')"
             @keyup.enter="handleUrlParse"
           />
           <button
@@ -35,10 +35,10 @@
             @click="handleUrlParse"
             :disabled="loading || !url.trim()"
           >
-            {{ loading ? '解析中...' : '解析链接' }}
+            {{ loading ? t('common.parsing') : t('upload.smartImport.parseUrl') }}
           </button>
         </div>
-        <small class="hint">微信公众号文章会自动识别标题、作者、发布时间和正文</small>
+        <small class="hint">{{ t('upload.smartImport.urlHint') }}</small>
       </div>
 
       <!-- Paste HTML -->
@@ -47,7 +47,7 @@
           v-model="htmlSource"
           class="form-textarea html-paste"
           rows="6"
-          placeholder="在此处粘贴网页 HTML 源码（右键网页 → 查看网页源代码 → 全选复制）"
+          :placeholder="t('upload.smartImport.htmlPlaceholder')"
         ></textarea>
         <button
           type="button"
@@ -55,9 +55,9 @@
           @click="handleHtmlParse"
           :disabled="loading || !htmlSource.trim()"
         >
-          {{ loading ? '解析中...' : '解析源码' }}
+          {{ loading ? t('common.parsing') : t('upload.smartImport.parseHtml') }}
         </button>
-        <small class="hint">当链接抓取失败时，粘贴源码是最稳定的方式</small>
+        <small class="hint">{{ t('upload.smartImport.htmlHint') }}</small>
       </div>
 
       <!-- File -->
@@ -76,7 +76,7 @@
             @click="triggerFileInput"
             :disabled="loading"
           >
-            {{ loading ? '解析中...' : '选择本地文件 (PDF / Word / TXT)' }}
+            {{ loading ? t('common.parsing') : t('upload.smartImport.selectFile') }}
           </button>
           <span v-if="file" class="file-name">{{ file.name }}</span>
         </div>
@@ -88,8 +88,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { parseService, type ParsedData } from '../api/services/parse.service'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   targetType?: string
@@ -99,11 +102,11 @@ const emit = defineEmits<{
   (e: 'parsed', data: ParsedData): void
 }>()
 
-const tabs = [
-  { label: '链接导入', value: 'url' },
-  { label: '粘贴源码', value: 'html' },
-  { label: '上传文件', value: 'file' }
-] as const
+const tabs = computed(() => [
+  { label: t('upload.smartImport.tabs.url'), value: 'url' as const },
+  { label: t('upload.smartImport.tabs.html'), value: 'html' as const },
+  { label: t('upload.smartImport.tabs.file'), value: 'file' as const }
+])
 
 const activeTab = ref<'url' | 'html' | 'file'>('url')
 const url = ref('')
@@ -126,7 +129,7 @@ const handleUrlParse = async () => {
     emit('parsed', res.data)
     url.value = ''
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || '链接解析失败，请尝试“粘贴源码”模式'
+    error.value = err.response?.data?.error?.message || t('errors.urlParseFailed')
   } finally {
     loading.value = false
   }
@@ -141,7 +144,7 @@ const handleHtmlParse = async () => {
     emit('parsed', res.data)
     htmlSource.value = ''
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || '源码解析失败'
+    error.value = err.response?.data?.error?.message || t('errors.htmlParseFailed')
   } finally {
     loading.value = false
   }
@@ -161,7 +164,7 @@ const handleFileParse = async (e: Event) => {
     file.value = null
     target.value = ''
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || '文件解析失败，仅支持 PDF, Word 或纯文本'
+    error.value = err.response?.data?.error?.message || t('errors.fileParseFailed')
   } finally {
     loading.value = false
   }

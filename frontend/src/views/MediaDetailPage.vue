@@ -23,7 +23,7 @@ const fetchMedia = async () => {
     const res = await mediaService.getMediaDetail(id.value)
     media.value = res.data
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to load media'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.loadMediaFailed')
   } finally {
     loading.value = false
   }
@@ -39,12 +39,12 @@ const canDeleteMedia = (item: MediaDetail) => {
 
 const handleDelete = async () => {
   if (!media.value) return
-  if (confirm('确认删除这张照片吗？此操作不可恢复。')) {
+  if (confirm(t('confirm.deleteMedia'))) {
     try {
       await mediaService.deleteMedia(media.value.id)
       router.push('/media')
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to delete media')
+      alert(err.response?.data?.error?.message || t('errors.deleteMediaFailed'))
     }
   }
 }
@@ -63,7 +63,7 @@ watch(id, fetchMedia)
 
     <div v-if="loading" class="loading-state delay-2 animate-slide-up">
       <div class="spinner"></div>
-      <span>Loading...</span>
+      <span>{{ t('common.loading') }}</span>
     </div>
 
     <div v-else-if="error" class="error-state delay-2 animate-slide-up">
@@ -76,7 +76,7 @@ watch(id, fetchMedia)
           v-if="media.type === 'PHOTO'"
           :src="mediaService.getMediaFileUrl(media.id)"
           class="media-main"
-          alt="Media"
+          :alt="$t('media.alt')"
         />
         <video
           v-else-if="media.type === 'VIDEO'"
@@ -88,21 +88,21 @@ watch(id, fetchMedia)
       </div>
 
       <div class="media-info">
-        <div class="media-type">{{ media.type === 'PHOTO' ? 'Photo' : 'Video' }}</div>
+        <div class="media-type">{{ media.type === 'PHOTO' ? $t('media.type.photo') : $t('media.type.video') }}</div>
         <p v-if="media.takenAt" class="info-row">
-          <span class="info-label">Time</span>
+          <span class="info-label">{{ $t('media.timeLabel') }}</span>
           <span>{{ new Date(media.takenAt).toLocaleString() }}</span>
         </p>
         <p v-if="media.year" class="info-row">
-          <span class="info-label">Year</span>
+          <span class="info-label">{{ $t('media.yearLabel') }}</span>
           <span>{{ media.year }}</span>
         </p>
         <p v-if="media.personTags && media.personTags.length > 0" class="info-row">
-          <span class="info-label">Members</span>
+          <span class="info-label">{{ $t('media.membersLabel') }}</span>
           <span>{{ media.personTags.map(p => p.displayName).join(', ') }}</span>
         </p>
         <div class="media-actions">
-          <button v-if="canDeleteMedia(media)" class="minimal-btn" @click="handleDelete">删除</button>
+          <button v-if="canDeleteMedia(media)" class="minimal-btn" @click="handleDelete">{{ $t('common.delete') }}</button>
         </div>
       </div>
     </div>

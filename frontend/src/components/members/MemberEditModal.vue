@@ -35,13 +35,13 @@ const form = ref<{
 })
 
 const teamOptions = [
-  { label: 'None', value: '' },
-  { label: 'Red Team', value: 'RED' },
-  { label: 'Blue Team', value: 'BLUE' }
+  { label: t('common.team.none'), value: '' },
+  { label: t('common.team.red'), value: 'RED' },
+  { label: t('common.team.blue'), value: 'BLUE' }
 ]
 
 const familyOptions = computed(() => [
-  { label: 'No Family', value: '' },
+  { label: t('people.form.noFamily'), value: '' },
   ...familiesStore.families.map(f => ({ label: f.label, value: f.id }))
 ])
 
@@ -66,7 +66,7 @@ const createFamily = async () => {
     form.value.familyId = family.id
     newFamilyLabel.value = ''
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to create family'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.createFamilyFailed')
   } finally {
     creatingFamily.value = false
   }
@@ -75,7 +75,7 @@ const createFamily = async () => {
 const handleSubmit = async () => {
   if (!props.member) return
   if (!form.value.displayName.trim()) {
-    error.value = 'Display name is required'
+    error.value = t('errors.displayNameRequired')
     return
   }
 
@@ -92,7 +92,7 @@ const handleSubmit = async () => {
     emit('updated', res.data)
     emit('close')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || err.message || 'Failed to update member'
+    error.value = err.response?.data?.error?.message || err.message || t('errors.updateMemberFailed')
   } finally {
     loading.value = false
   }
@@ -104,7 +104,7 @@ const handleSubmit = async () => {
     <div v-if="member" class="modal-overlay" @click="emit('close')">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ t('people.editMember') || 'Edit Member' }}</h2>
+          <h2 class="modal-title">{{ $t('people.editMember') }}</h2>
           <button class="close-btn" @click="emit('close')">&times;</button>
         </div>
 
@@ -112,24 +112,24 @@ const handleSubmit = async () => {
 
         <form @submit.prevent="handleSubmit" class="editorial-form">
           <div class="form-group">
-            <label class="form-label">DISPLAY NAME *</label>
+            <label class="form-label">{{ $t('people.form.displayName') }}</label>
             <input v-model="form.displayName" type="text" class="form-input" required />
           </div>
 
           <div class="form-group">
-            <label class="form-label">TEAM</label>
-            <OrganicDropdown v-model="form.team" :options="teamOptions" placeholder="None" />
+            <label class="form-label">{{ $t('people.form.team') }}</label>
+            <OrganicDropdown v-model="form.team" :options="teamOptions" :placeholder="$t('common.team.none')" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">FAMILY</label>
-            <OrganicDropdown v-model="form.familyId" :options="familyOptions" placeholder="No Family" />
+            <label class="form-label">{{ $t('people.form.family') }}</label>
+            <OrganicDropdown v-model="form.familyId" :options="familyOptions" :placeholder="$t('people.form.noFamily')" />
             <div v-if="!form.familyId" class="family-creator">
               <input
                 v-model="newFamilyLabel"
                 type="text"
                 class="form-input"
-                placeholder="Or type a new family name..."
+                :placeholder="$t('people.form.newFamilyPlaceholder')"
                 @keydown.enter.prevent="createFamily"
               />
               <button
@@ -138,27 +138,27 @@ const handleSubmit = async () => {
                 :disabled="!newFamilyLabel.trim() || creatingFamily"
                 @click="createFamily"
               >
-                <span v-if="creatingFamily">...</span>
-                <span v-else>+ Create</span>
+                <span v-if="creatingFamily">{{ $t('common.saving') }}</span>
+                <span v-else>{{ $t('people.form.createFamily') }}</span>
               </button>
             </div>
           </div>
 
           <div class="form-group inline">
-            <label class="form-label">CAPTAIN</label>
+            <label class="form-label">{{ $t('people.form.captain') }}</label>
             <label class="checkbox-label">
               <input v-model="form.isCaptain" type="checkbox" />
-              <span>Is captain</span>
+              <span>{{ $t('people.form.isCaptain') }}</span>
             </label>
           </div>
 
           <div class="form-actions">
             <button type="button" class="editorial-btn secondary" @click="emit('close')">
-              {{ t('common.cancel') || 'Cancel' }}
+              {{ $t('common.cancel') }}
             </button>
             <button type="submit" class="editorial-btn" :disabled="loading">
-              <span v-if="loading">...</span>
-              <span v-else>{{ t('common.save') || 'Save' }}</span>
+              <span v-if="loading">{{ $t('common.saving') }}</span>
+              <span v-else>{{ $t('common.save') }}</span>
             </button>
           </div>
         </form>

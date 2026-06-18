@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 const props = defineProps<{
   activeTab: 'chronicles' | 'media' | 'works' | 'matches'
   chroniclesCount: number
@@ -23,7 +19,7 @@ const emit = defineEmits<{
       :class="{ active: activeTab === 'chronicles' }"
       @click="emit('update:activeTab', 'chronicles')"
     >
-      <span class="tab-label">大事记</span>
+      <span class="tab-label">{{ $t('person.tabs.chronicles') }}</span>
       <span class="tab-count">{{ chroniclesCount }}</span>
     </button>
     <button
@@ -31,7 +27,7 @@ const emit = defineEmits<{
       :class="{ active: activeTab === 'media' }"
       @click="emit('update:activeTab', 'media')"
     >
-      <span class="tab-label">{{ t('app.menu.media') }}</span>
+      <span class="tab-label">{{ $t('app.menu.media') }}</span>
       <span class="tab-count">{{ mediaCount }}</span>
     </button>
     <button
@@ -39,7 +35,7 @@ const emit = defineEmits<{
       :class="{ active: activeTab === 'works' }"
       @click="emit('update:activeTab', 'works')"
     >
-      <span class="tab-label">{{ t('app.menu.works') }}</span>
+      <span class="tab-label">{{ $t('app.menu.works') }}</span>
       <span class="tab-count">{{ worksCount }}</span>
     </button>
     <button
@@ -47,7 +43,7 @@ const emit = defineEmits<{
       :class="{ active: activeTab === 'matches' }"
       @click="emit('update:activeTab', 'matches')"
     >
-      <span class="tab-label">比赛</span>
+      <span class="tab-label">{{ $t('person.tabs.matches') }}</span>
       <span class="tab-count">{{ matchesCount }}</span>
     </button>
   </div>
