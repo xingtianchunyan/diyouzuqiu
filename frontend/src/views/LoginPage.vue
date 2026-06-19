@@ -96,6 +96,10 @@
             {{ error }}
           </div>
 
+          <div v-if="success" class="form-success">
+            {{ success }}
+          </div>
+
           <div class="form-actions">
             <button type="submit" class="editorial-btn" :disabled="loading">
               <span v-if="loading">...</span>
@@ -126,6 +130,7 @@ const code = ref('')
 const codeId = ref('')
 const loading = ref(false)
 const error = ref('')
+const success = ref('')
 const sendingCode = ref(false)
 const countdown = ref(0)
 
@@ -151,6 +156,7 @@ const handleSendCode = async () => {
 
   sendingCode.value = true
   error.value = ''
+  success.value = ''
 
   try {
     const response = await authService.sendEmailOtp(email.value)
@@ -161,6 +167,7 @@ const handleSendCode = async () => {
       code.value = response.data.code
     }
 
+    success.value = t('auth.codeSent')
     startCountdown()
   } catch (err: any) {
     error.value = err.response?.data?.error?.message || t('auth.otpLoginFailed')
@@ -202,6 +209,7 @@ const handleLogin = async () => {
 
 watch(mode, () => {
   error.value = ''
+  success.value = ''
   password.value = ''
   code.value = ''
 })
@@ -368,6 +376,15 @@ watch(mode, () => {
   padding: 0.75rem;
   background: rgba(153, 27, 27, 0.05);
   border-left: 2px solid var(--error);
+}
+
+.form-success {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--success);
+  padding: 0.75rem;
+  background: rgba(22, 101, 52, 0.05);
+  border-left: 2px solid var(--success);
 }
 
 .form-actions {

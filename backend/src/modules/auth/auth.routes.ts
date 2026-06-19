@@ -6,7 +6,7 @@ import { validateBody, z } from '../../lib/validate.js'
 import { validatePassword } from '../../lib/password.js'
 import { clearFailures, createCaptcha, failureCount, recordFailure, requiresCaptcha, verifyCaptcha } from '../../lib/login-attempts.js'
 import { createOtp, verifyOtp } from '../../lib/otp/store.js'
-import { createOtpSender } from '../../lib/otp/sender.js'
+import { createOtpSender, smtpConfigured } from '../../lib/otp/sender.js'
 
 const TOKEN_COOKIE_NAME = 'token'
 const TOKEN_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
@@ -232,12 +232,12 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(500).send({ error: { code: 'SEND_FAILED', message: 'Failed to send verification code' } })
     }
 
-    // In non-production environments we return the code to facilitate testing.
-    // In production the code is only delivered via the configured channel.
-    if (isProduction()) {
-      return { codeId: id, expiresIn }
+    // When SMTP is not configured (dev/test) we return the code to facilitate testing.
+    // When SMTP is configured the code is only delivered via the real email channel.
+    if (!smtpConfigured()) {
+      return { codeId: id, code, expiresIn }
     }
-    return { codeId: id, code, expiresIn }
+    return { codeId: id, expiresIn }
   })
 
   app.post('/auth/otp/login', {
