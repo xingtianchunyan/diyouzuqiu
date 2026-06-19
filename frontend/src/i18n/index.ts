@@ -477,7 +477,11 @@ const messages = {
         partialFailure: '导入完成，部分失败',
         stats: '总计 {total} 行｜成功 {created} 个账号｜新建 {createdMembers} 名队员｜新建 {createdFamilies} 个家庭',
         failureRow: '第 {row} 行（{email}）：{reason}',
-        start: '开始导入'
+        start: '开始导入',
+        invalidPasswordsTitle: '存在密码不合规的行',
+        invalidPasswordRow: '第 {row} 行（{email}）：密码需至少 8 位且包含大写、小写和数字；留空则由系统随机生成',
+        generatedPasswordsTitle: '系统生成的临时密码',
+        generatedPasswordsHint: '以下账号的密码为空，已由系统随机生成。请妥善保存并尽快通知对应用户修改密码。'
       }
     },
     editor: {
@@ -1024,7 +1028,11 @@ const messages = {
         partialFailure: 'Import completed with partial failures',
         stats: 'Total {total} rows | {created} accounts created | {createdMembers} members created | {createdFamilies} families created',
         failureRow: 'Row {row} ({email}): {reason}',
-        start: 'Start Import'
+        start: 'Start Import',
+        invalidPasswordsTitle: 'Rows with invalid passwords',
+        invalidPasswordRow: 'Row {row} ({email}): password must be at least 8 characters with uppercase, lowercase and digits; leave empty to auto-generate',
+        generatedPasswordsTitle: 'System-generated temporary passwords',
+        generatedPasswordsHint: 'These accounts had empty passwords and have been assigned random passwords. Please save them securely and notify users to change their passwords soon.'
       }
     },
     editor: {

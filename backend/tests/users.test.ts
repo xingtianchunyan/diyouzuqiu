@@ -89,7 +89,7 @@ describe('Admin User Management', () => {
         users: [
           { email: 'batch1@test.com', password: 'StrongPass1', role: 'MEMBER', memberName: 'Batch Member 1', team: 'RED', familyName: 'Batch Family' },
           { email: 'batch2@test.com', password: 'StrongPass1', role: 'MEMBER', memberName: 'Batch Member 2', team: 'BLUE', familyName: 'Batch Family' },
-          { email: 'batch3@test.com', password: 'StrongPass1', role: 'ADMIN' }
+          { email: 'batch3@test.com', password: 'StrongPass1', role: 'MEMBER' }
         ]
       }
     })
@@ -101,6 +101,38 @@ describe('Admin User Management', () => {
     expect(json.summary.createdMembers).toBe(2)
     expect(json.summary.createdFamilies).toBe(1)
     expect(json.summary.failed).toHaveLength(0)
+    expect(json.generatedPasswords).toHaveLength(0)
+  })
+
+  it('POST /api/v1/admin/users/batch generates temporary passwords and rejects ADMIN role', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/users/batch',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        users: [
+          { email: 'generated1@test.com', password: '', role: 'MEMBER' },
+          { email: 'generated2@test.com', password: '', memberName: 'Generated Member', team: 'RED' }
+        ]
+      }
+    })
+    expect(res.statusCode).toBe(200)
+    const json = res.json()
+    expect(json.success).toBe(true)
+    expect(json.summary.created).toBe(2)
+    expect(json.generatedPasswords).toHaveLength(2)
+    expect(json.generatedPasswords[0].email).toBe('generated1@test.com')
+    expect(json.generatedPasswords[0].password).toHaveLength(12)
+
+    const adminRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/users/batch',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        users: [{ email: 'adminbatch@test.com', password: 'StrongPass1', role: 'ADMIN' }]
+      }
+    })
+    expect(adminRes.statusCode).toBe(400)
   })
 
   it('POST /api/v1/admin/users/parse-excel parses xlsx file', async () => {

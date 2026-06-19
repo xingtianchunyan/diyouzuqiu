@@ -167,23 +167,27 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@diyou.test'
-    const adminPassword = process.env.ADMIN_PASSWORD || 'diyou2024'
-    try {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10)
-      await prisma.user.upsert({
-        where: { email: adminEmail },
-        update: {
-          password: hashedPassword,
-          role: 'ADMIN'
-        },
-        create: {
-          email: adminEmail,
-          password: hashedPassword,
-          role: 'ADMIN'
-        }
-      })
-    } catch (err) {
-      app.log.error(err)
+    const adminPassword = process.env.ADMIN_PASSWORD
+    if (!adminPassword) {
+      app.log.warn('ADMIN_PASSWORD is not set; skipping default admin seed.')
+    } else {
+      try {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10)
+        await prisma.user.upsert({
+          where: { email: adminEmail },
+          update: {
+            password: hashedPassword,
+            role: 'ADMIN'
+          },
+          create: {
+            email: adminEmail,
+            password: hashedPassword,
+            role: 'ADMIN'
+          }
+        })
+      } catch (err) {
+        app.log.error(err)
+      }
     }
   }
 

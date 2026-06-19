@@ -1,10 +1,16 @@
 import type { FastifyPluginAsync } from 'fastify'
+import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma.js'
 import bcrypt from 'bcryptjs'
 import { validateBody, validateParams, z } from '../../lib/validate.js'
 import { validatePassword } from '../../lib/password.js'
 import { sanitizeCsvCell } from '../../lib/csv-sanitize.js'
 import { parseExcelToRows } from '../../lib/documentParser.js'
+
+function generateTemporaryPassword(length = 12): string {
+  // base64url encoding avoids characters that look similar or break URLs.
+  return randomBytes(length).toString('base64url').slice(0, length)
+}
 
 const userIdParamsSchema = z.object({
   id: z.string().min(1)
@@ -40,8 +46,8 @@ const batchCreateUsersSchema = z.object({
   users: z.array(
     z.object({
       email: z.string().email(),
-      password: z.string().min(8),
-      role: z.enum(['ADMIN', 'MEMBER']).optional(),
+      password: z.string().max(128),
+      role: z.enum(['MEMBER']).optional(),
       memberName: z.string().optional(),
       team: z.string().optional(),
       familyName: z.string().optional()
@@ -113,19 +119,22 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     return { id: user.id, email: user.email, phone: user.phone, role: user.role, memberId: user.memberId }
   })
 
-  app.post('/batch', { preValidation: validateBody(batchCreateUsersSchema) }, async (request, reply) => {
+  app.post('/batch', {
+    preValidation: validateBody(batchCreateUsersSchema),
+    config: { skipXssEscape: true }
+  }, async (request, reply) => {
     const { users } = (request as any).validatedBody as {
       users: Array<{
         email: string
         password: string
-        role?: 'ADMIN' | 'MEMBER'
+        role?: 'MEMBER'
         memberName?: string
         team?: string
         familyName?: string
       }>
     }
 
-    const summary = await prisma.$transaction(async (tx) => {
+    const { summary, generatedPasswords } = await prisma.$transaction(async (tx) => {
       const existingMembers = await tx.member.findMany({
         include: { family: { select: { label: true } } }
       })
@@ -140,6 +149,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
         createdFamilies: 0,
         failed: [] as Array<{ row: number; email: string; reason: string }>
       }
+      const generatedPasswords: Array<{ email: string; password: string }> = []
 
       for (const [index, row] of users.entries()) {
         try {
@@ -147,7 +157,14 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
           row.memberName = sanitizeCsvCell(row.memberName) as string | undefined
           row.familyName = sanitizeCsvCell(row.familyName) as string | undefined
 
-          const passwordCheck = validatePassword(row.password)
+          let plainPassword = row.password.trim()
+          let generated = false
+          if (!plainPassword) {
+            plainPassword = generateTemporaryPassword()
+            generated = true
+          }
+
+          const passwordCheck = validatePassword(plainPassword)
           if (!passwordCheck.valid) {
             throw new Error(passwordCheck.message)
           }
@@ -186,7 +203,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
             memberId = member.id
           }
 
-          const hashedPassword = await bcrypt.hash(row.password, 10)
+          const hashedPassword = await bcrypt.hash(plainPassword, 10)
           await tx.user.create({
             data: {
               email: row.email,
@@ -197,15 +214,18 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
           })
 
           result.created++
+          if (generated) {
+            generatedPasswords.push({ email: row.email, password: plainPassword })
+          }
         } catch (err: any) {
           result.failed.push({ row: index + 1, email: row.email, reason: err.message })
         }
       }
 
-      return result
+      return { summary: result, generatedPasswords }
     })
 
-    return reply.code(200).send({ success: summary.failed.length === 0, summary })
+    return reply.code(200).send({ success: summary.failed.length === 0, summary, generatedPasswords })
   })
 
   app.post('/parse-excel', async (request, reply) => {

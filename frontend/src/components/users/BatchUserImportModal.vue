@@ -43,8 +43,8 @@ const createEmptyRow = (): ImportRow => ({
 })
 
 const rows = ref<ImportRow[]>([
-  { email: 'zhangsan@example.com', password: 'Diyou2024', role: 'MEMBER', memberName: '张三', team: 'RED', familyName: '张家' },
-  { email: 'lisi@example.com', password: 'Diyou2024', role: 'MEMBER', memberName: '李四', team: 'BLUE', familyName: '李家' }
+  { email: 'zhangsan@example.com', password: '', role: 'MEMBER', memberName: '张三', team: 'RED', familyName: '张家' },
+  { email: 'lisi@example.com', password: '', role: 'MEMBER', memberName: '李四', team: 'BLUE', familyName: '李家' }
 ])
 
 const loading = ref(false)
@@ -59,6 +59,7 @@ const result = ref<{
     createdFamilies: number
     failed: Array<{ row: number; email: string; reason: string }>
   }
+  generatedPasswords?: Array<{ email: string; password: string }>
 } | null>(null)
 
 const HEADER_MAP: Record<string, keyof ImportRow> = {
@@ -82,7 +83,21 @@ const HEADER_MAP: Record<string, keyof ImportRow> = {
   家庭名: 'familyName'
 }
 
-const validRows = computed(() => rows.value.filter((r) => r.email.trim() && r.password.trim()))
+function isPasswordValid(password: string): boolean {
+  if (!password) return true // empty means auto-generate on the backend
+  if (password.length < 8) return false
+  return /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password)
+}
+
+const invalidRows = computed(() =>
+  rows.value
+    .map((r, index) => ({ row: r, index }))
+    .filter(({ row }) => row.email.trim() && !isPasswordValid(row.password))
+)
+
+const validRows = computed(() =>
+  rows.value.filter((r) => r.email.trim() && isPasswordValid(r.password))
+)
 
 watch(
   () => props.show,
@@ -281,6 +296,15 @@ const handleClose = () => {
             {{ $t('admin.batchImport.validRows', { n: validRows.length }) }}
           </div>
 
+          <div v-if="invalidRows.length" class="result fail">
+            <div class="result-title">{{ $t('admin.batchImport.invalidPasswordsTitle') }}</div>
+            <ul class="result-failures">
+              <li v-for="item in invalidRows" :key="item.index">
+                {{ $t('admin.batchImport.invalidPasswordRow', { row: item.index + 1, email: item.row.email }) }}
+              </li>
+            </ul>
+          </div>
+
           <div v-if="result" class="result" :class="{ ok: result.success, fail: !result.success }">
             <div class="result-title">
               {{ result.success ? $t('admin.batchImport.success') : $t('admin.batchImport.partialFailure') }}
@@ -288,6 +312,17 @@ const handleClose = () => {
             <div class="result-stats">
               {{ $t('admin.batchImport.stats', result.summary) }}
             </div>
+
+            <div v-if="result.generatedPasswords?.length" class="generated-passwords">
+              <div class="result-title">{{ $t('admin.batchImport.generatedPasswordsTitle') }}</div>
+              <p class="generated-passwords-hint">{{ $t('admin.batchImport.generatedPasswordsHint') }}</p>
+              <ul class="generated-passwords-list">
+                <li v-for="item in result.generatedPasswords" :key="item.email">
+                  <code>{{ item.email }}</code> — <code class="password">{{ item.password }}</code>
+                </li>
+              </ul>
+            </div>
+
             <ul v-if="result.summary.failed.length" class="result-failures">
               <li v-for="f in result.summary.failed" :key="f.row + f.email">
                 {{ $t('admin.batchImport.failureRow', { row: f.row, email: f.email, reason: f.reason }) }}
@@ -561,6 +596,42 @@ select.cell-input {
   font-size: 0.85rem;
   color: var(--error);
   line-height: 1.6;
+}
+
+.generated-passwords {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(22, 101, 52, 0.05);
+  border-left: 3px solid var(--success);
+}
+
+.generated-passwords-hint {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0.5rem;
+}
+
+.generated-passwords-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--text-h);
+  line-height: 1.6;
+}
+
+.generated-passwords-list code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: var(--bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.generated-passwords-list code.password {
+  color: var(--success);
+  font-weight: 600;
 }
 
 .form-actions {
