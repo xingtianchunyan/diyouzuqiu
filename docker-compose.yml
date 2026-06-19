@@ -10,11 +10,19 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - HOST=${HOST:-0.0.0.0}
       - DATABASE_URL=${DATABASE_URL:-file:/data/db/diyou.db}
       - STORAGE_ROOT=${STORAGE_ROOT:-/data/storage}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@diyou.test}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-diyou2024}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - CORS_ORIGIN=${CORS_ORIGIN:-true}
+      # Optional SMTP for real email OTP
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
     volumes:
       - diyou-db:/data/db
       - diyou-storage:/data/storage

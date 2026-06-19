@@ -8,8 +8,21 @@ import { sanitizeCsvCell } from '../../lib/csv-sanitize.js'
 import { parseExcelToRows } from '../../lib/documentParser.js'
 
 function generateTemporaryPassword(length = 12): string {
-  // base64url encoding avoids characters that look similar or break URLs.
-  return randomBytes(length).toString('base64url').slice(0, length)
+  // Guarantee at least one uppercase, one lowercase and one digit.
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const lower = 'abcdefghijklmnopqrstuvwxyz'
+  const digits = '0123456789'
+  const all = upper + lower + digits
+
+  const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)]
+
+  let password = pick(upper) + pick(lower) + pick(digits)
+  for (let i = 3; i < length; i++) {
+    password += pick(all)
+  }
+
+  // Shuffle to avoid predictable positions.
+  return password.split('').sort(() => Math.random() - 0.5).join('')
 }
 
 const userIdParamsSchema = z.object({

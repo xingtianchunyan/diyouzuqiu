@@ -1,6 +1,6 @@
 # Diyou 档案站 - NAS Docker 部署指南
 
-本指南面向希望把项目部署到家庭 NAS（已安装 Docker 和 Docker Compose）的目标用户。
+本指南面向希望把项目部署到家庭 NAS（已安装 Docker 和 Docker Compose）的用户。
 
 ## 1. 前提条件
 
@@ -16,7 +16,7 @@
 
 ```bash
 cd /volume1/docker
-git clone <项目仓库地址> diyou
+git clone https://github.com/xingtianchunyan/diyouzuqiu.git diyou
 cd diyou
 ```
 
@@ -29,19 +29,27 @@ cp .env.example .env
 nano .env   # 或用任何文本编辑器
 ```
 
-至少修改以下两项：
+至少修改以下三项：
 
 ```env
 # 必须改成强密码
 JWT_SECRET=your-random-secret-here
 
-# 初始管理员账号密码
+# 初始管理员账号密码（当前版本已删除默认回退，必须设置）
 ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=your-strong-password
+
+# Docker 内必须保持 0.0.0.0
+HOST=0.0.0.0
 ```
 
-如果只在局域网使用，保持 `SITE_ADDRESS=localhost` 即可；
-如果有公网域名并能解析到 NAS，则填写域名，例如 `SITE_ADDRESS=nas.yourdomain.com`。
+密码强度要求：**至少 8 位，同时包含大写字母、小写字母和数字**。
+
+可选配置：
+
+- `SITE_ADDRESS`：仅局域网使用保持 `localhost`；有公网域名则填写域名。
+- `CORS_ORIGIN`：生产环境建议指定为前端域名，例如 `https://nas.yourdomain.com`。
+- `SMTP_*`：配置后可发送真实邮箱验证码；未配置时验证码仅输出到日志。
 
 ### 2.3 启动服务
 
@@ -49,7 +57,8 @@ ADMIN_PASSWORD=your-strong-password
 docker compose up -d --build
 ```
 
-首次启动会自动执行数据库迁移并创建管理员账号。
+首次启动会自动执行数据库迁移并创建管理员账号。  
+如果 `ADMIN_PASSWORD` 未设置，容器会启动失败并提示 `ADMIN_PASSWORD is required`。
 
 ### 2.4 访问
 
@@ -77,7 +86,7 @@ docker compose up -d --build
 
 如果 NAS 有公网 IP 和域名：
 
-1. 将 `SITE_ADDRESS` 改为你的域名。
+1. 将 `SITE_ADDRESS` 改为你的域名，同时设置 `CORS_ORIGIN=https://<你的域名>`。
 2. 使用 HTTPS 覆盖文件启动：
 
 ```bash
@@ -128,10 +137,10 @@ docker compose --profile watchtower up -d
 
 ## 6. 用户管理
 
-- 管理员登录后，可通过 `/api/v1/admin/users` 管理账号。
-- 创建新用户时，密码必须至少 8 位，且同时包含字母和数字。
-- 忘记密码时，管理员可在后台重置任意用户密码。
-- 用户也可在“我的账号”中自行修改密码。
+- 管理员登录后，可通过“账号管理”批量或单独创建账号。
+- 单独创建账号时，密码必须至少 8 位，且同时包含大写、小写、数字。
+- **批量导入时**，角色只能为 `MEMBER`；密码留空时系统会自动生成 12 位随机临时密码，并在导入结果中返回。
+- 忘记密码时，管理员可在后台重置任意用户密码；用户也可在“我的账号”中自行修改密码。
 
 ## 7. 更新版本
 
@@ -183,3 +192,8 @@ docker compose restart diyou-backend
 ```
 
 下次启动时会用新密码覆盖管理员账号。
+
+### 9.4 邮箱验证码无法收到
+
+- 未配置 SMTP 时属于正常现象，验证码会输出到后端日志。
+- 配置 SMTP 后仍失败，请检查 `SMTP_HOST/PORT/USER/PASS` 及邮箱授权码设置。

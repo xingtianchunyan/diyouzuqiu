@@ -1,6 +1,7 @@
 # 棣友档案站 NAS Docker 傻瓜式部署指南
 
-> 目标：不需要懂代码，只要会复制粘贴命令，就能把网站跑起来。
+> 目标：不需要懂代码，只要会复制粘贴命令，就能把网站跑起来。  
+> 本指南对应项目当前版本（含邮箱验证码、知识库、账号批量导入等功能）。
 
 ---
 
@@ -44,14 +45,25 @@
 scp -r E:\diyou admin@192.168.0.105:/volume1/docker/
 ```
 
+### 方法 C：用 Git 拉取
+
+如果 NAS 能访问 GitHub：
+
+```bash
+cd /volume1/docker
+git clone https://github.com/xingtianchunyan/diyouzuqiu.git diyou
+cd diyou
+```
+
 ---
 
 ## 三、配置环境变量
 
 1. 在 NAS 上进入 `diyou` 文件夹。
 2. 找到 `diyou/.env.example` 文件，复制一份，重命名为 `.env`。
+3. 用文本编辑器打开 `.env`，至少修改下面 **加粗的三项**。
 
-文件内容如下（可以直接复制修改）：
+完整的 `.env` 示例：
 
 ```env
 # 访问地址
@@ -67,14 +79,25 @@ HTTPS_PORT=443
 # openssl rand -base64 32
 JWT_SECRET=改成上面命令生成的随机字符串
 
-# 管理员账号
+# 初始管理员账号（必须修改，否则无法登录）
 ADMIN_EMAIL=admin@diyou.test
-ADMIN_PASSWORD=Diyou2024!
+ADMIN_PASSWORD=改成你的强密码
+
+# 后端监听地址（Docker 内必须保持 0.0.0.0，不要改）
+HOST=0.0.0.0
 
 # 下面这些一般不用改
 DATABASE_URL=file:/data/db/diyou.db
 STORAGE_ROOT=/data/storage
 CORS_ORIGIN=true
+
+# 可选：真实邮箱验证码（SMTP）
+# 不配置时，邮箱验证码只在后台日志打印，方便测试
+# SMTP_HOST=smtp.example.com
+# SMTP_PORT=587
+# SMTP_USER=你的邮箱用户名
+# SMTP_PASS=你的邮箱授权码
+# SMTP_FROM=noreply@diyouzuqiu.com
 ```
 
 ### 必填项说明
@@ -83,10 +106,16 @@ CORS_ORIGIN=true
 |---|---|---|
 | `JWT_SECRET` | 一串随机字符，越乱越好 | `aBcD1234xyz...` |
 | `ADMIN_EMAIL` | 管理员登录邮箱 | `admin@diyou.test` |
-| `ADMIN_PASSWORD` | 管理员密码，至少 8 位，同时含字母和数字 | `Diyou2024!` |
+| `ADMIN_PASSWORD` | 管理员密码，至少 8 位，同时含**大写、小写、数字** | `Diyou2024!` |
 | `SITE_ADDRESS` | 公网域名，没有就保持 `localhost` | `localhost` |
+| `HOST` | Docker 部署保持 `0.0.0.0` | `0.0.0.0` |
 
-> ⚠️ **密码必须同时包含英文字母和阿拉伯数字，且不少于 8 位，否则系统会拒绝。**
+> ⚠️ **密码必须同时包含大写字母、小写字母和数字，且不少于 8 位，否则系统会拒绝。**
+
+### 邮箱验证码说明
+
+- **测试/局域网**：不填 SMTP 部分，验证码会显示在后端日志里，登录页也会自动填入。
+- **正式交付**：建议配置 SMTP，用户点击“发送验证码”后会收到真实邮件。常见邮箱配置可参考 `.env.example` 注释。
 
 ---
 
@@ -94,7 +123,7 @@ CORS_ORIGIN=true
 
 ### 1. 用 SSH 登录 NAS
 
-群晖：控制面板 → 终端机和 SNMP → 启用 SSH。
+群晖：控制面板 → 终端机和 SNMP → 启用 SSH。  
 威联通：控制台 → 网络与文件服务 → Telnet/SSH → 允许 SSH。
 
 在电脑打开终端（Windows 用 PowerShell，Mac 用 Terminal），执行：
@@ -118,6 +147,8 @@ docker compose up -d --build
 ```
 
 第一次会下载镜像、编译前后端、创建数据库，可能需要 **5–15 分钟**，请耐心等待。
+
+> 如果提示 `ADMIN_PASSWORD is required`，说明 `.env` 里没有填管理员密码，请回去修改。
 
 ### 4. 查看运行状态
 
@@ -157,7 +188,7 @@ https://192.168.0.105
 
 ```text
 邮箱：admin@diyou.test
-密码：Diyou2024!
+密码：你刚才在 .env 里设置的 ADMIN_PASSWORD
 ```
 
 ---
@@ -180,7 +211,17 @@ https://192.168.0.105
 3. 填写姓名、选择队伍（红队/蓝队）、选择家庭。
 4. 提交。
 
-### 3. 上传文章/诗集
+### 3. 批量导入账号（可选）
+
+1. 进入“账号管理”页面。
+2. 点击“批量导入”。
+3. 在表格中填写：邮箱、密码、角色（目前只支持 MEMBER）、队员姓名、队伍、家庭。
+4. 也可以上传 CSV / Excel 自动填充。
+5. 密码留空时，系统会自动生成 12 位随机临时密码，并在导入成功后显示给管理员。
+
+> 批量导入**不能创建管理员**，管理员账号必须单独创建。
+
+### 4. 上传文章/诗集
 
 1. 进入“上传”页面。
 2. 选择“文章/诗集”标签。
@@ -189,27 +230,33 @@ https://192.168.0.105
 5. 修改或补充内容。
 6. 提交。
 
-### 4. 上传照片/视频
+### 5. 上传照片/视频
 
 1. 进入“上传”页面。
 2. 选择“媒体”标签。
 3. 选择文件上传。
 4. 系统会自动识别照片拍摄时间，也可以手动修改。
 
-### 5. 记录比赛
+### 6. 记录比赛
 
 1. 进入“上传”页面。
 2. 选择“比赛”标签。
 3. 填写比赛时间、红队比分、蓝队比分、参赛队员、MVP。
 4. 提交。
 
-### 6. 创建纪事
+### 7. 创建纪事
 
 1. 进入“上传”页面。
 2. 选择“纪事”标签。
 3. 填写标题、发生日期、描述。
 4. 可以关联已有的照片、视频、文章、比赛。
 5. 提交。
+
+### 8. 使用知识库（可选）
+
+1. 进入“知识库”页面。
+2. 上传 docx / xlsx / pdf 等工作文档。
+3. 可与知识库对话，或基于文档生成活动策划。
 
 ---
 
@@ -233,6 +280,7 @@ docker compose restart
 
 ```bash
 cd /volume1/docker/diyou
+git pull                  # 如果用 git 拉取的项目
 docker compose down
 docker compose pull
 docker compose up -d --build
@@ -288,6 +336,8 @@ cd /volume1/docker/diyou
 
 ```env
 SITE_ADDRESS=diyou.yourdomain.com
+# 建议同时指定 CORS 来源
+CORS_ORIGIN=https://diyou.yourdomain.com
 ```
 
 4. 用 HTTPS 覆盖文件启动：
@@ -308,6 +358,11 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
 - 检查 NAS IP 是否填对。
 - 检查 NAS 防火墙是否放行 80/443 端口。
 - 执行 `docker compose ps` 看容器是否都在运行。
+- 如果 `diyou-backend` 一直 `unhealthy`，看日志：
+
+```bash
+docker compose logs -f diyou-backend
+```
 
 ### 2. 提示“证书不安全”
 
@@ -316,12 +371,14 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
 
 ### 3. 忘记管理员密码
 
-修改 `.env` 里的 `ADMIN_PASSWORD`，然后重启：
+修改 `.env` 里的 `ADMIN_PASSWORD` 为新的强密码，然后重启：
 
 ```bash
 cd /volume1/docker/diyou
 docker compose restart diyou-backend
 ```
+
+下次启动时会用新密码覆盖管理员账号。
 
 ### 4. 容器起不来
 
@@ -334,9 +391,18 @@ docker compose logs -f diyou-backend
 常见原因：
 
 - `JWT_SECRET` 没改。
+- `ADMIN_PASSWORD` 没设置。
 - 端口 80/443 被 NAS 自带服务占用，可以改成 `HTTP_PORT=8080`、`HTTPS_PORT=8443`。
 
-### 5. 电脑进不了 BIOS，本地跑不了 Docker
+### 5. 邮箱验证码收不到
+
+- 如果没有配置 SMTP，这是正常的，验证码会打印在后端日志里。
+- 如果配置了 SMTP 仍收不到，检查：
+  - `SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS` 是否填对。
+  - 是否用的是“授权码”而不是登录密码（QQ/163/Gmail 通常如此）。
+  - 查看后端日志里的具体报错。
+
+### 6. 电脑进不了 BIOS，本地跑不了 Docker
 
 不影响 NAS 部署。NAS 本身的 Docker 不需要你电脑的 BIOS。部署和访问都在 NAS 上进行。
 
