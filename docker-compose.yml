@@ -16,7 +16,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@diyou.test}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
-      - CORS_ORIGIN=${CORS_ORIGIN:-true}
+      - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN must be set in production}
+      # Caddy reverse proxies all traffic, so the backend can trust X-Forwarded-For.
+      - TRUST_PROXY=true
       # Optional SMTP for real email OTP
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}

@@ -1,22 +1,30 @@
 # 棣友档案站 NAS Docker 傻瓜式部署指南
 
-> 目标：不需要懂代码，只要会复制粘贴命令，就能把网站跑起来。  
+> 目标：不需要懂代码，只要会复制粘贴，就能把网站跑起来。  
 > 本指南对应项目当前版本（含邮箱验证码、知识库、账号批量导入等功能）。
+
+---
+
+## 🌟 推荐：使用“填表生成器”（最简单）
+
+如果你的客户或你自己不想手动改配置文件，请直接使用：
+
+```
+deploy/diyou-deploy-wizard.html
+```
+
+**用法**：在 Windows 电脑上双击这个文件，浏览器打开后按提示填写：NAS IP/域名、管理员账号、邮箱授权码等，最后点击 **“生成部署文件包”**，会下载一个 `diyou-zspace-deploy.zip`。把 zip 解压到极空间上，再按本指南第六章导入即可。
+
+下面章节为手动部署说明，供参考。
 
 ---
 
 ## 一、先确认这几件事
 
-1. 你有一台 **NAS**（群晖 Synology、威联通 QNAP、自组 NAS 都可以）。
-2. NAS 上已安装 **Docker** 和 **Docker Compose**（Compose 版本 2 以上）。
+1. 你有一台 **极空间 NAS**（或其他支持 Docker Compose 的 NAS，如群晖、威联通）。
+2. NAS 上已安装 **Docker** 和 **Docker Compose**。
 3. 你的电脑和 NAS 连接在同一个路由器/局域网内。
 4. 你知道 NAS 的 **局域网 IP 地址**（例如 `192.168.0.105`）。
-
-如果不确定 NAS IP：
-
-- 群晖：打开 Synology Assistant 查看。
-- 威联通：打开 Qfinder Pro 查看。
-- 路由器后台：查看设备列表。
 
 ---
 
@@ -25,32 +33,23 @@
 ### 方法 A：用电脑复制（最简单）
 
 1. 把项目压缩包解压到电脑桌面，得到一个名为 `diyou` 的文件夹。
-2. 打开 NAS 的共享文件夹，例如 `\\192.168.0.105\docker` 或 `\\NAS_NAME\docker`。
+2. 打开 NAS 的共享文件夹，例如 `\\192.168.0.105\docker`。
 3. 把 `diyou` 文件夹复制进去。
 
 最终 NAS 上的路径应该类似：
 
 ```text
-/volume1/docker/diyou
+/SATA存储/docker/diyou
 ```
 
-> 群晖用户：共享文件夹通常在 `/volume1/` 下；威联通类似。如果你的共享文件夹叫 `homes` 或 `Data`，对应放里面就行。
+> 极空间用户：共享文件夹通常在 `/SATA存储/` 或 `/M2存储/` 下。
 
-### 方法 B：用命令行复制（适合会 SSH 的人）
-
-在电脑上打开 PowerShell / Terminal，执行：
-
-```bash
-# 把本地项目复制到 NAS（需要替换 IP 和用户名）
-scp -r E:\diyou admin@192.168.0.105:/volume1/docker/
-```
-
-### 方法 C：用 Git 拉取
+### 方法 B：用 Git 拉取
 
 如果 NAS 能访问 GitHub：
 
 ```bash
-cd /volume1/docker
+cd /SATA存储/docker
 git clone https://github.com/xingtianchunyan/diyouzuqiu.git diyou
 cd diyou
 ```
@@ -61,23 +60,22 @@ cd diyou
 
 1. 在 NAS 上进入 `diyou` 文件夹。
 2. 找到 `diyou/.env.example` 文件，复制一份，重命名为 `.env`。
-3. 用文本编辑器打开 `.env`，至少修改下面 **加粗的三项**。
+3. 用文本编辑器打开 `.env`，至少修改下面 **加粗的几项**。
 
 完整的 `.env` 示例：
 
 ```env
 # 访问地址
-# 只在局域网用就保持 localhost；有公网域名再改
-SITE_ADDRESS=localhost
+# 只在局域网用就填写极空间 IP；有公网域名再改
+SITE_ADDRESS=192.168.0.105
 
 # Web 端口
 HTTP_PORT=80
 HTTPS_PORT=443
 
 # 安全密钥：必须改！
-# 打开 NAS 的 SSH，执行下面命令生成：
-# openssl rand -base64 32
-JWT_SECRET=改成上面命令生成的随机字符串
+# 执行下面命令生成：openssl rand -base64 32
+JWT_SECRET=改成随机字符串
 
 # 初始管理员账号（必须修改，否则无法登录）
 ADMIN_EMAIL=admin@diyou.test
@@ -86,18 +84,21 @@ ADMIN_PASSWORD=改成你的强密码
 # 后端监听地址（Docker 内必须保持 0.0.0.0，不要改）
 HOST=0.0.0.0
 
+# 跨域来源，必须与您访问网站的地址一致
+# 局域网 IP：https://192.168.0.105
+# 公网域名：https://diyou.yourdomain.com
+CORS_ORIGIN=https://192.168.0.105
+
 # 下面这些一般不用改
 DATABASE_URL=file:/data/db/diyou.db
 STORAGE_ROOT=/data/storage
-CORS_ORIGIN=true
 
-# 可选：真实邮箱验证码（SMTP）
-# 不配置时，邮箱验证码只在后台日志打印，方便测试
-# SMTP_HOST=smtp.example.com
-# SMTP_PORT=587
-# SMTP_USER=你的邮箱用户名
-# SMTP_PASS=你的邮箱授权码
-# SMTP_FROM=noreply@diyouzuqiu.com
+# 真实邮箱验证码（SMTP）
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=587
+SMTP_USER=你的邮箱@qq.com
+SMTP_PASS=你的授权码
+SMTP_FROM=你的邮箱@qq.com
 ```
 
 ### 必填项说明
@@ -107,64 +108,46 @@ CORS_ORIGIN=true
 | `JWT_SECRET` | 一串随机字符，越乱越好 | `aBcD1234xyz...` |
 | `ADMIN_EMAIL` | 管理员登录邮箱 | `admin@diyou.test` |
 | `ADMIN_PASSWORD` | 管理员密码，至少 8 位，同时含**大写、小写、数字** | `Diyou2024!` |
-| `SITE_ADDRESS` | 公网域名，没有就保持 `localhost` | `localhost` |
+| `SITE_ADDRESS` | 极空间 IP 或域名 | `192.168.0.105` |
+| `CORS_ORIGIN` | 必须与浏览器地址栏一致 | `https://192.168.0.105` |
 | `HOST` | Docker 部署保持 `0.0.0.0` | `0.0.0.0` |
 
-> ⚠️ **密码必须同时包含大写字母、小写字母和数字，且不少于 8 位，否则系统会拒绝。**
+> ⚠️ **生产环境 `CORS_ORIGIN` 不能写 `true`，必须填写实际访问地址。**
 
-### 邮箱验证码说明
+### 邮箱授权码获取
 
-- **测试/局域网**：不填 SMTP 部分，验证码会显示在后端日志里，登录页也会自动填入。
-- **正式交付**：建议配置 SMTP，用户点击“发送验证码”后会收到真实邮件。常见邮箱配置可参考 `.env.example` 注释。
+- **QQ 邮箱**：登录网页版 → 设置 → 账户 → 开启“IMAP/SMTP服务” → 获取 16 位授权码。
+- **163 邮箱**：设置 → POP3/SMTP/IMAP → 开启服务 → 获取授权码。
+- **Gmail**：开启两步验证 → 生成“应用专用密码”。
 
 ---
 
-## 四、启动网站
+## 四、启动网站（极空间 Docker）
 
-### 1. 用 SSH 登录 NAS
+### 1. 打开极空间 Docker 应用
 
-群晖：控制面板 → 终端机和 SNMP → 启用 SSH。  
-威联通：控制台 → 网络与文件服务 → Telnet/SSH → 允许 SSH。
+依次点击：**Docker → Compose → 新建项目**。
 
-在电脑打开终端（Windows 用 PowerShell，Mac 用 Terminal），执行：
+### 2. 导入项目
 
-```bash
-ssh admin@192.168.0.105
-```
+- 项目名称填 `diyou`。
+- 添加方式选择 **“从本地导入（NAS）”**。
+- 选中刚才的 `/SATA存储/docker/diyou` 文件夹。
+- 确认代码框里已经读取了 `docker-compose.yaml`。
 
-把 `admin` 换成你的 NAS 管理员用户名，`192.168.0.105` 换成你的 NAS IP。
+### 3. 创建并启动
 
-### 2. 进入项目目录
+点击 **“创建”**。系统会自动下载 GitHub Container Registry 上的预构建镜像并启动。
 
-```bash
-cd /volume1/docker/diyou
-```
-
-### 3. 一键启动
-
-```bash
-docker compose up -d --build
-```
-
-第一次会下载镜像、编译前后端、创建数据库，可能需要 **5–15 分钟**，请耐心等待。
-
-> 如果提示 `ADMIN_PASSWORD is required`，说明 `.env` 里没有填管理员密码，请回去修改。
+首次启动大约需要 **5–15 分钟**，取决于网络速度。
 
 ### 4. 查看运行状态
 
-```bash
-docker compose ps
-```
-
-正常应该看到 `diyou-backend`、`diyou-web` 两个容器是 `Up (healthy)` 状态。
+在极空间 Docker 的“容器”标签页，确认 `diyou-backend` 和 `diyou-web` 都是运行中状态。
 
 ### 5. 看启动日志（出问题才需要）
 
-```bash
-docker compose logs -f diyou-backend
-```
-
-按 `Ctrl + C` 退出日志查看。
+在容器列表里点击 `diyou-backend` → “日志”查看。
 
 ---
 
@@ -178,9 +161,9 @@ docker compose logs -f diyou-backend
 https://192.168.0.105
 ```
 
-把 IP 换成你的 NAS IP。
+把 IP 换成你的极空间 IP。
 
-> 第一次访问会提示“证书不安全”，这是因为 NAS 本地部署用的是自签名证书。**点击“高级” → “继续前往”即可**。
+> 第一次访问会提示“证书不安全”，这是因为本地部署用的是自签名证书。**点击“高级” → “继续前往”即可**。
 
 ### 登录
 

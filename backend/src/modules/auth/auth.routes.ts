@@ -241,7 +241,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.post('/auth/otp/login', {
-    preValidation: validateBody(otpLoginSchema)
+    preValidation: validateBody(otpLoginSchema),
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 minute'
+      }
+    }
   }, async (request, reply) => {
     const { email, codeId, code } = (request as any).validatedBody as {
       email: string

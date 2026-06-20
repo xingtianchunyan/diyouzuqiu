@@ -34,9 +34,11 @@ npm run -w backend test
 npm run -w frontend build
 ```
 
-## 生产部署（Docker NAS）
+## 生产部署（极空间 / Docker NAS）
 
+- **给客户用的填表生成器**：双击 `deploy/diyou-deploy-wizard.html`，按提示填写即可生成部署包。
+- 傻瓜式逐步操作指南：[DEPLOY-GUIDE.md](./DEPLOY-GUIDE.md)
 - 技术部署说明：[DEPLOY.md](./DEPLOY.md)
-- 傻瓜式逐步操作指南（给客户/自己用）：[DEPLOY-GUIDE.md](./DEPLOY-GUIDE.md)
+- 预构建镜像 CI：[.github/workflows/docker.yml](./.github/workflows/docker.yml)
 
 > 部署前请务必将 `.env.example` 复制为 `.env`，并修改 `JWT_SECRET` 和 `ADMIN_PASSWORD`。

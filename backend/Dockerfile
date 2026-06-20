@@ -32,7 +32,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATABASE_URL=file:/data/db/diyou.db
 ENV STORAGE_ROOT=/data/storage
-ENV JWT_SECRET=change_me_in_production
+# JWT_SECRET must be provided at runtime; do not hardcode defaults in the image.
 
 EXPOSE 3000
 

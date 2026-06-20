@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>棣友档案站 · 极空间部署向导</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #166534;
+      --error: #991b1b;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 18px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    header h1 { margin: 0 0 8px; font-size: 1.6rem; }
+    header p { margin: 0; color: var(--muted); font-size: 1rem; }
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .step h2 {
+      margin: 0 0 16px;
+      font-size: 1.25rem;
+      color: var(--primary-dark);
+    }
+    .step h2 .num {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      margin-right: 10px;
+      font-size: 1rem;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .hint {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    input[type="text"], input[type="password"], input[type="email"], input[type="number"], select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 1.05rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+    input.invalid, select.invalid { border-color: var(--error); background: #fef2f2; }
+    .row { display: flex; gap: 12px; }
+    .row .field { flex: 1; }
+    .inline-btn {
+      padding: 10px 16px;
+      font-size: 1rem;
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .inline-btn:hover { background: #cbd5e1; }
+    .radio-group { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .radio-group label { display: flex; align-items: center; gap: 10px; font-weight: normal; cursor: pointer; }
+    .radio-group input { width: 22px; height: 22px; }
+    .error-msg {
+      color: var(--error);
+      font-size: 0.95rem;
+      margin-top: 6px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+    .strength { height: 6px; border-radius: 3px; margin-top: 6px; background: #e5e7eb; overflow: hidden; }
+    .strength-bar { height: 100%; width: 0; transition: width 0.2s, background 0.2s; }
+    .actions {
+      text-align: center;
+      margin: 30px 0;
+    }
+    .primary-btn {
+      padding: 16px 36px;
+      font-size: 1.15rem;
+      color: #fff;
+      background: var(--primary);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .primary-btn:hover { background: var(--primary-dark); }
+    .primary-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    .result {
+      display: none;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .result h2 { color: var(--success); margin-top: 0; }
+    .file-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      font-family: Consolas, monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .copy-btn {
+      margin-top: 8px;
+      padding: 8px 14px;
+      font-size: 0.95rem;
+      background: #e2e8f0;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    details { margin-top: 14px; }
+    summary { font-weight: 600; cursor: pointer; color: var(--primary-dark); }
+    ol.steps { padding-left: 22px; }
+    ol.steps li { margin-bottom: 12px; }
+    .warning {
+      background: #fff7ed;
+      border-left: 4px solid #f97316;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin: 14px 0;
+      font-size: 0.98rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏆 棣友档案站 · 极空间部署向导</h1>
+      <p>跟着提示一步一步填，生成部署文件后复制到极空间即可</p>
+    </header>
+
+    <!-- 步骤 1：访问方式 -->
+    <div class="step">
+      <h2><span class="num">1</span>网站访问方式</h2>
+      <div class="field">
+        <label>您希望用什么地址访问网站？</label>
+        <div class="radio-group">
+          <label><input type="radio" name="accessMode" value="ip" checked> 暂时用极空间局域网 IP 访问（先不买域名）</label>
+          <label><input type="radio" name="accessMode" value="domain"> 已有公网域名，用域名访问</label>
+        </div>
+      </div>
+      <div class="field" id="domainField" style="display:none">
+        <label>您的域名</label>
+        <div class="hint">例如：diyou.yourdomain.com（不需要写 https://）</div>
+        <input type="text" id="domain" placeholder="diyou.yourdomain.com">
+        <div class="error-msg" id="domainError">请填写正确的域名</div>
+      </div>
+      <div class="field" id="ipField">
+        <label>极空间 NAS 的局域网 IP</label>
+        <div class="hint">打开极空间手机 App → 设备管理 → 查看形如 192.168.x.x 的地址</div>
+        <input type="text" id="nasIp" placeholder="192.168.0.105">
+        <div class="error-msg" id="nasIpError">请填写类似 192.168.x.x 的 IP 地址</div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>HTTP 端口</label>
+          <input type="number" id="httpPort" value="80">
+        </div>
+        <div class="field">
+          <label>HTTPS 端口</label>
+          <input type="number" id="httpsPort" value="443">
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤 2：NAS 存储路径 -->
+    <div class="step">
+      <h2><span class="num">2</span>极空间上的存放位置</h2>
+      <div class="field">
+        <label>项目文件夹路径</label>
+        <div class="hint">在极空间文件管理里新建一个文件夹，例如 <code>/SATA存储/docker/diyou</code>。<br>然后点击“查询路径”按钮复制完整路径粘贴到这里。</div>
+        <input type="text" id="nasPath" value="/SATA存储/docker/diyou">
+        <div class="error-msg" id="nasPathError">路径不能为空</div>
+      </div>
+    </div>
+
+    <!-- 步骤 3：安全密钥 -->
+    <div class="step">
+      <h2><span class="num">3</span>安全密钥（JWT_SECRET）</h2>
+      <div class="field">
+        <label>这是给登录令牌加密的密码，越乱越好</label>
+        <div class="hint">可以点击下方按钮自动生成，也可以自己写一串复杂字符。请妥善保存。</div>
+        <div class="row">
+          <input type="text" id="jwtSecret" placeholder="点击右侧按钮生成" readonly>
+          <button class="inline-btn" type="button" onclick="generateJwtSecret()">🔐 帮我生成</button>
+        </div>
+        <div class="error-msg" id="jwtSecretError">请先生成或填写 JWT_SECRET</div>
+      </div>
+    </div>
+
+    <!-- 步骤 4：管理员账号 -->
+    <div class="step">
+      <h2><span class="num">4</span>管理员账号</h2>
+      <div class="field">
+        <label>管理员邮箱</label>
+        <input type="email" id="adminEmail" placeholder="admin@diyou.test">
+        <div class="error-msg" id="adminEmailError">请填写正确的邮箱地址</div>
+      </div>
+      <div class="field">
+        <label>管理员密码</label>
+        <div class="hint">至少 8 位，必须同时包含大写字母、小写字母和数字。</div>
+        <input type="password" id="adminPassword" placeholder="请输入管理员密码">
+        <div class="strength"><div class="strength-bar" id="strengthBar"></div></div>
+        <div class="error-msg" id="adminPasswordError">密码不符合要求</div>
+      </div>
+    </div>
+
+    <!-- 步骤 5：邮箱验证码 -->
+    <div class="step">
+      <h2><span class="num">5</span>邮箱验证码（SMTP）</h2>
+      <p class="hint">用户点击“发送验证码”后，系统会用这个邮箱把验证码发给用户。</p>
+      <div class="field">
+        <label>邮箱服务商</label>
+        <select id="smtpProvider">
+          <option value="qq">QQ 邮箱</option>
+          <option value="163">163 邮箱</option>
+          <option value="gmail">Gmail</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>SMTP 服务器地址</label>
+        <input type="text" id="smtpHost" value="smtp.qq.com">
+      </div>
+      <div class="field">
+        <label>SMTP 端口</label>
+        <input type="number" id="smtpPort" value="587">
+      </div>
+      <div class="field">
+        <label>发件邮箱地址</label>
+        <input type="email" id="smtpUser" placeholder="your_qq@qq.com">
+        <div class="error-msg" id="smtpUserError">请填写发件邮箱</div>
+      </div>
+      <div class="field">
+        <label>SMTP 授权码</label>
+        <div class="hint" id="smtpPassHint">不是登录密码！请前往 QQ 邮箱 → 设置 → 账户 → 开启 SMTP 后获取 16 位授权码。</div>
+        <input type="password" id="smtpPass" placeholder="请输入授权码">
+        <div class="error-msg" id="smtpPassError">请填写授权码</div>
+      </div>
+      <div class="field">
+        <label>发件人显示名称（可选）</label>
+        <input type="text" id="smtpFrom" placeholder="棣友档案站">
+      </div>
+      <div class="warning" id="smtpWarning" style="display:none"></div>
+    </div>
+
+    <!-- 生成按钮 -->
+    <div class="actions">
+      <button class="primary-btn" id="generateBtn" onclick="generatePackage()">📦 生成部署文件包</button>
+    </div>
+
+    <!-- 结果展示 -->
+    <div class="result" id="result">
+      <h2>✅ 生成成功！</h2>
+      <p>请点击下方按钮下载 <code>diyou-zspace-deploy.zip</code>，然后按步骤操作。</p>
+      <button class="primary-btn" onclick="downloadZip()">⬇️ 下载部署包</button>
+
+      <details>
+        <summary>查看生成的 .env 文件（可核对）</summary>
+        <div class="file-box" id="envPreview"></div>
+        <button class="copy-btn" onclick="copyText('envPreview')">复制</button>
+      </details>
+
+      <details>
+        <summary>查看生成的 docker-compose.yaml</summary>
+        <div class="file-box" id="composePreview"></div>
+        <button class="copy-btn" onclick="copyText('composePreview')">复制</button>
+      </details>
+
+      <div class="step" style="margin-top:20px">
+        <h2>📋 下一步：把文件放到极空间</h2>
+        <ol class="steps" id="deploySteps"></ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const providerPresets = {
+      qq: { host: 'smtp.qq.com', port: 587, hint: '不是登录密码！请前往 QQ 邮箱 → 设置 → 账户 → 开启 SMTP 后获取 16 位授权码。' },
+      163: { host: 'smtp.163.com', port: 587, hint: '不是登录密码！请前往 163 邮箱 → 设置 → POP3/SMTP/IMAP → 开启后获取授权码。' },
+      gmail: { host: 'smtp.gmail.com', port: 587, hint: '请使用 Google 账号的“应用专用密码”（App Password），不是邮箱登录密码。' },
+      other: { host: '', port: 587, hint: '请填写您的 SMTP 服务器提供的授权码或密码。' }
+    };
+
+    document.querySelectorAll('input[name="accessMode"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const useDomain = r.value === 'domain';
+        document.getElementById('domainField').style.display = useDomain ? 'block' : 'none';
+        document.getElementById('ipField').style.display = useDomain ? 'none' : 'block';
+      });
+    });
+
+    document.getElementById('smtpProvider').addEventListener('change', (e) => {
+      const p = providerPresets[e.target.value];
+      document.getElementById('smtpHost').value = p.host;
+      document.getElementById('smtpPort').value = p.port;
+      document.getElementById('smtpPassHint').textContent = p.hint;
+    });
+
+    document.getElementById('adminPassword').addEventListener('input', checkPasswordStrength);
+
+    function generateJwtSecret() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+      let s = '';
+      const arr = new Uint32Array(48);
+      crypto.getRandomValues(arr);
+      for (const v of arr) s += chars[v % chars.length];
+      document.getElementById('jwtSecret').value = s;
+      document.getElementById('jwtSecret').classList.remove('invalid');
+      document.getElementById('jwtSecretError').classList.remove('show');
+    }
+
+    function checkPasswordStrength() {
+      const pw = document.getElementById('adminPassword').value;
+      const bar = document.getElementById('strengthBar');
+      const hasLower = /[a-z]/.test(pw);
+      const hasUpper = /[A-Z]/.test(pw);
+      const hasDigit = /\d/.test(pw);
+      const long = pw.length >= 8;
+      const score = [hasLower, hasUpper, hasDigit, long].filter(Boolean).length;
+      const colors = ['#e5e7eb', '#ef4444', '#f97316', '#84cc16', '#22c55e'];
+      bar.style.width = (score / 4 * 100) + '%';
+      bar.style.background = colors[score];
+    }
+
+    function setInvalid(id, invalid) {
+      const el = document.getElementById(id);
+      const err = document.getElementById(id + 'Error');
+      if (invalid) {
+        el.classList.add('invalid');
+        err.classList.add('show');
+      } else {
+        el.classList.remove('invalid');
+        err.classList.remove('show');
+      }
+    }
+
+    function validateIp(ip) {
+      return /^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(ip);
+    }
+
+    function validateDomain(d) {
+      return /^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}(\.[a-zA-Z0-9][a-zA-Z0-9-]{0,62})+$/.test(d);
+    }
+
+    let generatedEnv = '';
+    let generatedCompose = '';
+    let generatedSteps = '';
+
+    function generatePackage() {
+      const useDomain = document.querySelector('input[name="accessMode"]:checked').value === 'domain';
+      const domain = document.getElementById('domain').value.trim();
+      const nasIp = document.getElementById('nasIp').value.trim();
+      const nasPath = document.getElementById('nasPath').value.trim();
+      const httpPort = document.getElementById('httpPort').value || '80';
+      const httpsPort = document.getElementById('httpsPort').value || '443';
+      const jwtSecret = document.getElementById('jwtSecret').value.trim();
+      const adminEmail = document.getElementById('adminEmail').value.trim();
+      const adminPassword = document.getElementById('adminPassword').value;
+      const smtpHost = document.getElementById('smtpHost').value.trim();
+      const smtpPort = document.getElementById('smtpPort').value || '587';
+      const smtpUser = document.getElementById('smtpUser').value.trim();
+      const smtpPass = document.getElementById('smtpPass').value;
+      const smtpFrom = document.getElementById('smtpFrom').value.trim() || smtpUser;
+
+      let valid = true;
+
+      if (useDomain) {
+        if (!validateDomain(domain)) { setInvalid('domain', true); valid = false; } else setInvalid('domain', false);
+      } else {
+        if (!validateIp(nasIp)) { setInvalid('nasIp', true); valid = false; } else setInvalid('nasIp', false);
+      }
+
+      if (!nasPath) { setInvalid('nasPath', true); valid = false; } else setInvalid('nasPath', false);
+      if (!jwtSecret) { setInvalid('jwtSecret', true); valid = false; } else setInvalid('jwtSecret', false);
+
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail);
+      if (!emailOk) { setInvalid('adminEmail', true); valid = false; } else setInvalid('adminEmail', false);
+
+      const pwOk = /[a-z]/.test(adminPassword) && /[A-Z]/.test(adminPassword) && /\d/.test(adminPassword) && adminPassword.length >= 8;
+      if (!pwOk) { setInvalid('adminPassword', true); valid = false; } else setInvalid('adminPassword', false);
+
+      const smtpUserOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpUser);
+      if (!smtpUserOk) { setInvalid('smtpUser', true); valid = false; } else setInvalid('smtpUser', false);
+      if (!smtpPass) { setInvalid('smtpPass', true); valid = false; } else setInvalid('smtpPass', false);
+
+      if (!valid) {
+        document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+
+      const siteAddress = useDomain ? domain : nasIp;
+      const corsOrigin = useDomain ? `https://${domain}` : `https://${nasIp}`;
+
+      generatedEnv = `# 棣友档案站 - 极空间部署环境变量
+# 生成时间：${new Date().toLocaleString()}
+
+SITE_ADDRESS=${siteAddress}
+HTTP_PORT=${httpPort}
+HTTPS_PORT=${httpsPort}
+
+JWT_SECRET=${jwtSecret}
+
+ADMIN_EMAIL=${adminEmail}
+ADMIN_PASSWORD=${adminPassword}
+
+# Docker 容器内必须保持 0.0.0.0
+HOST=0.0.0.0
+
+DATABASE_URL=file:/data/db/diyou.db
+STORAGE_ROOT=/data/storage
+
+# 跨域来源，必须与您访问网站时地址栏里的地址一致
+CORS_ORIGIN=${corsOrigin}
+
+# 邮箱验证码 SMTP 配置
+SMTP_HOST=${smtpHost}
+SMTP_PORT=${smtpPort}
+SMTP_USER=${smtpUser}
+SMTP_PASS=${smtpPass}
+SMTP_FROM=${smtpFrom}
+`;
+
+      const volumePath = nasPath.replace(/\/$/, '');
+      generatedCompose = `services:
+  diyou-backend:
+    image: ghcr.io/xingtianchunyan/diyou-backend:latest
+    container_name: diyou-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - TRUST_PROXY=true
+      - DATABASE_URL=file:/data/db/diyou.db
+      - STORAGE_ROOT=/data/storage
+      - JWT_SECRET=${jwtSecret}
+      - ADMIN_EMAIL=${adminEmail}
+      - ADMIN_PASSWORD=${adminPassword}
+      - CORS_ORIGIN=${corsOrigin}
+      - SMTP_HOST=${smtpHost}
+      - SMTP_PORT=${smtpPort}
+      - SMTP_USER=${smtpUser}
+      - SMTP_PASS=${smtpPass}
+      - SMTP_FROM=${smtpFrom}
+    volumes:
+      - ${volumePath}/db:/data/db
+      - ${volumePath}/storage:/data/storage
+    networks:
+      - diyou-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  diyou-web:
+    image: ghcr.io/xingtianchunyan/diyou-web:latest
+    container_name: diyou-web
+    restart: unless-stopped
+    environment:
+      - SITE_ADDRESS=${siteAddress}
+      - BACKEND_URL=diyou-backend:3000
+    ports:
+      - "${httpPort}:80"
+      - "${httpsPort}:443"
+    volumes:
+      - ${volumePath}/caddy-data:/data
+      - ${volumePath}/caddy-config:/config
+    networks:
+      - diyou-net
+    depends_on:
+      diyou-backend:
+        condition: service_healthy
+
+networks:
+  diyou-net:
+    driver: bridge
+`;
+
+      const accessUrl = useDomain ? `https://${domain}${httpsPort === '443' ? '' : ':' + httpsPort}` : `https://${nasIp}${httpsPort === '443' ? '' : ':' + httpsPort}`;
+      generatedSteps = `
+<li>把下载的 <code>diyou-zspace-deploy.zip</code> 解压到电脑上，得到 <code>.env</code> 和 <code>docker-compose.yaml</code>。</li>
+<li>在极空间文件管理中新建文件夹：<code>${volumePath}</code>，并在里面再建 <code>db</code>、<code>storage</code>、<code>caddy-data</code>、<code>caddy-config</code> 四个子文件夹。</li>
+<li>把解压出来的两个文件复制到这个文件夹里。</li>
+<li>打开极空间 Docker 应用，点击“Compose”→“新建项目”。</li>
+<li>项目名称填 <code>diyou</code>，添加方式选择“从本地导入（NAS）”，然后选中刚才的 <code>${volumePath}</code> 文件夹。</li>
+<li>确认代码框里已经正确读取了 <code>docker-compose.yaml</code> 内容，点击“创建”。</li>
+<li>等待镜像下载并启动（首次大约 5-15 分钟，取决于网络速度）。</li>
+<li>在浏览器中打开 <code>${accessUrl}</code>，用管理员邮箱 <code>${adminEmail}</code> 和刚才设置的密码登录。</li>
+<li>如果浏览器提示“证书不安全”，请点击“高级”→“继续前往”。</li>
+<li>登录后，进入“账号管理”创建普通用户账号。</li>
+`;
+
+      document.getElementById('envPreview').textContent = generatedEnv;
+      document.getElementById('composePreview').textContent = generatedCompose;
+      document.getElementById('deploySteps').innerHTML = generatedSteps;
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function downloadZip() {
+      if (!generatedEnv || !generatedCompose) {
+        alert('请先生成部署文件');
+        return;
+      }
+      const zip = new JSZip();
+      zip.file('.env', generatedEnv);
+      zip.file('docker-compose.yaml', generatedCompose);
+      zip.file('部署步骤.txt', document.getElementById('deploySteps').innerText);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'diyou-zspace-deploy.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function copyText(elementId) {
+      const text = document.getElementById(elementId).textContent;
+      navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
+    }
+  </script>
+</body>
+</html>

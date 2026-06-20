@@ -34,14 +34,20 @@ function getCorsOrigin(): boolean | string | string[] {
     }
     return false
   }
-  if (raw === 'true') return true
+  if (raw === 'true') {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CORS_ORIGIN cannot be "true" in production; please specify the exact frontend origin(s)')
+    }
+    return true
+  }
   if (raw === 'false') return false
   return raw.split(',').map(s => s.trim())
 }
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: process.env.NODE_ENV === 'test' ? false : true
+    logger: process.env.NODE_ENV === 'test' ? false : true,
+    trustProxy: process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production'
   })
 
   await app.register(cors, {

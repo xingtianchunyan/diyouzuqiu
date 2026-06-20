@@ -2,10 +2,22 @@
 
 本指南面向希望把项目部署到家庭 NAS（已安装 Docker 和 Docker Compose）的用户。
 
+## 0. 给非技术用户：使用填表生成器
+
+如果你不想手动编辑配置文件，直接双击运行：
+
+```
+deploy/diyou-deploy-wizard.html
+```
+
+按提示填写 NAS IP/域名、管理员账号、SMTP 授权码等信息，即可下载 `diyou-zspace-deploy.zip`，解压到极空间后导入 Compose 项目即可。
+
+---
+
 ## 1. 前提条件
 
 - NAS 已安装 Docker Engine 和 Docker Compose（v2 插件）。
-- 已准备好一个文件夹存放项目，例如 `/volume1/docker/diyou`。
+- 已准备好一个文件夹存放项目，例如 `/SATA存储/docker/diyou`。
 - 知道 NAS 的局域网 IP 地址。
 
 ## 2. 快速开始
@@ -15,7 +27,7 @@
 把项目文件放到 NAS 上：
 
 ```bash
-cd /volume1/docker
+cd /SATA存储/docker
 git clone https://github.com/xingtianchunyan/diyouzuqiu.git diyou
 cd diyou
 ```
@@ -29,36 +41,47 @@ cp .env.example .env
 nano .env   # 或用任何文本编辑器
 ```
 
-至少修改以下三项：
+至少修改以下项：
 
 ```env
-# 必须改成强密码
+# 访问地址
+SITE_ADDRESS=192.168.0.105
+
+# 安全密钥（生成：openssl rand -base64 32）
 JWT_SECRET=your-random-secret-here
 
-# 初始管理员账号密码（当前版本已删除默认回退，必须设置）
+# 初始管理员账号密码（必须设置，无默认值）
 ADMIN_EMAIL=admin@yourdomain.com
 ADMIN_PASSWORD=your-strong-password
 
 # Docker 内必须保持 0.0.0.0
 HOST=0.0.0.0
+
+# 生产环境必须填写实际访问地址，不能写 true
+CORS_ORIGIN=https://192.168.0.105
+
+# 真实邮箱验证码 SMTP
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=587
+SMTP_USER=your@qq.com
+SMTP_PASS=your-auth-code
+SMTP_FROM=your@qq.com
 ```
 
 密码强度要求：**至少 8 位，同时包含大写字母、小写字母和数字**。
 
-可选配置：
+### 2.3 启动服务（极空间 GUI）
 
-- `SITE_ADDRESS`：仅局域网使用保持 `localhost`；有公网域名则填写域名。
-- `CORS_ORIGIN`：生产环境建议指定为前端域名，例如 `https://nas.yourdomain.com`。
-- `SMTP_*`：配置后可发送真实邮箱验证码；未配置时验证码仅输出到日志。
+1. 打开极空间 Docker 应用 → Compose → 新建项目。
+2. 项目名称填 `diyou`，添加方式选择“从本地导入（NAS）”。
+3. 选中项目文件夹 `/SATA存储/docker/diyou`。
+4. 点击“创建”，系统会自动拉取 GitHub Container Registry 预构建镜像。
 
-### 2.3 启动服务
+或命令行：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
-
-首次启动会自动执行数据库迁移并创建管理员账号。  
-如果 `ADMIN_PASSWORD` 未设置，容器会启动失败并提示 `ADMIN_PASSWORD is required`。
 
 ### 2.4 访问
 

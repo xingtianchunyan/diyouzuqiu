@@ -1,5 +1,32 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
+import { validateBody, validateParams, z } from '../../lib/validate.js'
+
+const participantSchema = z.object({
+  memberId: z.string().min(1),
+  side: z.enum(['RED', 'BLUE'])
+})
+
+const createMatchSchema = z.object({
+  playedAt: z.string().datetime(),
+  redScore: z.number().int().min(0),
+  blueScore: z.number().int().min(0),
+  mvpMemberId: z.string().optional(),
+  participantIds: z.array(participantSchema).optional()
+})
+
+const updateMatchSchema = z.object({
+  playedAt: z.string().datetime().optional(),
+  redScore: z.number().int().min(0).optional(),
+  blueScore: z.number().int().min(0).optional(),
+  mvpMemberId: z.string().optional().nullable(),
+  notes: z.string().max(2000).optional(),
+  participantIds: z.array(participantSchema).optional()
+})
+
+const matchParamsSchema = z.object({
+  id: z.string().min(1)
+})
 
 export const matchesRoutes: FastifyPluginAsync = async (app) => {
   // GET /matches
@@ -40,19 +67,17 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /matches (MEMBER+)
-  app.post('/matches', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { playedAt, redScore, blueScore, mvpMemberId, participantIds } = request.body as {
-      playedAt?: string
-      redScore?: number
-      blueScore?: number
+  app.post('/matches', {
+    preValidation: [app.authenticate, validateBody(createMatchSchema)]
+  }, async (request, reply) => {
+    const { playedAt, redScore, blueScore, mvpMemberId, participantIds } = (request as any).validatedBody as {
+      playedAt: string
+      redScore: number
+      blueScore: number
       mvpMemberId?: string
-      participantIds?: { memberId: string, side: 'RED' | 'BLUE' }[]
+      participantIds?: { memberId: string; side: 'RED' | 'BLUE' }[]
     }
-    
-    if (!playedAt || typeof redScore !== 'number' || typeof blueScore !== 'number') {
-      return reply.code(400).send({ error: { code: 'BAD_REQUEST', message: 'playedAt, redScore, and blueScore are required' } })
-    }
-    
+
     try {
       const match = await prisma.match.create({
         data: {
@@ -70,7 +95,7 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
         },
         select: { id: true }
       })
-      
+
       return reply.code(201).send(match)
     } catch (err: any) {
       return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create match' } })
@@ -78,8 +103,10 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // GET /matches/:id
-  app.get('/matches/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
+  app.get('/matches/:id', {
+    preValidation: [app.authenticate, validateParams(matchParamsSchema)]
+  }, async (request, reply) => {
+    const { id } = (request as any).validatedParams as { id: string }
     
     const match = await prisma.match.findUnique({
       where: { id },
@@ -111,8 +138,10 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // PUT /matches/:id
-  app.put('/matches/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
+  app.put('/matches/:id', {
+    preValidation: [app.authenticate, validateParams(matchParamsSchema), validateBody(updateMatchSchema)]
+  }, async (request, reply) => {
+    const { id } = (request as any).validatedParams as { id: string }
     const user = request.user as { id: string; role: string; memberId?: string }
 
     const match = await prisma.match.findUnique({ where: { id } })
@@ -127,11 +156,11 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'Insufficient permissions to update match' } })
     }
 
-    const { playedAt, redScore, blueScore, mvpMemberId, notes, participantIds } = request.body as {
+    const { playedAt, redScore, blueScore, mvpMemberId, notes, participantIds } = (request as any).validatedBody as {
       playedAt?: string
       redScore?: number
       blueScore?: number
-      mvpMemberId?: string
+      mvpMemberId?: string | null
       notes?: string
       participantIds?: { memberId: string; side: 'RED' | 'BLUE' }[]
     }
@@ -174,8 +203,10 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE /matches/:id
-  app.delete('/matches/:id', { preValidation: [app.authenticate] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
+  app.delete('/matches/:id', {
+    preValidation: [app.authenticate, validateParams(matchParamsSchema)]
+  }, async (request, reply) => {
+    const { id } = (request as any).validatedParams as { id: string }
     const user = request.user as { id: string; role: string; memberId?: string }
 
     const match = await prisma.match.findUnique({

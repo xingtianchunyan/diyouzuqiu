@@ -65,12 +65,21 @@ function smtpConfigured(): boolean {
 
 export function createOtpSender(): OtpSender {
   // When SMTP is fully configured we send real emails regardless of NODE_ENV.
-  // Otherwise fall back to console logging for development and tests.
   if (smtpConfigured()) {
     // eslint-disable-next-line no-console
     console.log('[OTP] SMTP is configured; using real email sender')
     return smtpSender
   }
+
+  // In production, never fall back to the console sender: email OTP would be
+  // returned in the API response, completely bypassing the "something you have"
+  // factor. Require SMTP to be configured before starting.
+  if (isProduction()) {
+    throw new Error(
+      'SMTP is not configured. Email OTP is enabled in production; please set SMTP_HOST, SMTP_USER and SMTP_PASS.'
+    )
+  }
+
   // eslint-disable-next-line no-console
   console.log('[OTP] SMTP not configured; using console sender')
   return consoleSender
