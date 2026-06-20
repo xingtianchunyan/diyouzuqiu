@@ -25,7 +25,7 @@ jobs:
         env:
           JWT_SECRET: ci-test-secret
           ADMIN_EMAIL: admin@ci.test
-          ADMIN_PASSWORD: ci-password
+          ADMIN_PASSWORD: CiPassword123!
 
   frontend:
     runs-on: ubuntu-latest
