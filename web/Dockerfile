@@ -15,12 +15,14 @@ RUN npm run -w frontend build
 # Production image: Caddy serves the static frontend
 FROM caddy:2-alpine
 
-# The official Caddy image defaults to the non-root 'caddy' user, so
-# explicitly switch to root before running permission-changing commands.
+# The official Caddy image runs as root by default, but it does not guarantee
+# a 'caddy' user exists. Switch to root and create the user/group if missing.
 USER root
 
-# Create non-root user directories and set permissions
-RUN mkdir -p /config/caddy /data/caddy /srv && \
+# Create the non-root user/group used to run Caddy, then prepare directories.
+RUN (getent group caddy || addgroup -S caddy) && \
+    (id -u caddy >/dev/null 2>&1 || adduser -S -G caddy caddy) && \
+    mkdir -p /config/caddy /data/caddy /srv && \
     chown -R caddy:caddy /srv /config /data
 
 COPY --from=builder --chown=caddy:caddy /app/frontend/dist /srv
