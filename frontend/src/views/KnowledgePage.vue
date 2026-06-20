@@ -7,8 +7,6 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import ChatPanel from '../components/knowledge/ChatPanel.vue'
 import UploadDocModal from '../components/knowledge/UploadDocModal.vue'
-import GeneratePlanModal from '../components/knowledge/GeneratePlanModal.vue'
-import PlanResultView from '../components/knowledge/PlanResultView.vue'
 
 const { t } = useI18n()
 
@@ -24,9 +22,6 @@ const selectedDoc = ref<KnowledgeDoc | null>(null)
 const chatMode = ref(false)
 
 const showUploadModal = ref(false)
-const showGenerateModal = ref(false)
-const showPlanResult = ref(false)
-const planResult = ref<any>(null)
 
 const categories: { key: CategoryFilter; label: string }[] = [
   { key: 'ALL', label: t('knowledge.category.all') },
@@ -102,13 +97,6 @@ function closeDocModal() {
   chatMode.value = false
 }
 
-function newChat() {
-  selectedDoc.value = null
-  chatMode.value = true
-  activeCategory.value = 'PLANNER_CHAT'
-  showDocModal.value = true
-}
-
 function parseChatContent(content: string): ChatMessage[] {
   const messages: ChatMessage[] = []
   const lines = content.split('\n')
@@ -144,12 +132,6 @@ const chatInitialMessages = computed<ChatMessage[]>(() => {
   if (!selectedDoc.value || !chatMode.value) return []
   return parseChatContent(selectedDoc.value.content)
 })
-
-function onPlanGenerated(plan: any) {
-  planResult.value = plan
-  showPlanResult.value = true
-  showDocModal.value = false
-}
 </script>
 
 <template>
@@ -182,9 +164,7 @@ function onPlanGenerated(plan: any) {
           :placeholder="t('knowledge.searchPlaceholder')"
         />
         <div class="toolbar-actions">
-          <button class="action-btn" @click="newChat">{{ t('knowledge.newChat') }}</button>
           <button class="action-btn" @click="showUploadModal = true">{{ t('knowledge.uploadDoc') }}</button>
-          <button class="action-btn" @click="showGenerateModal = true">{{ t('knowledge.generatePlan') }}</button>
         </div>
       </div>
 
@@ -237,28 +217,7 @@ function onPlanGenerated(plan: any) {
             :title="selectedDoc?.title"
             :initial-messages="chatInitialMessages"
             @close="closeDocModal"
-            @plan="onPlanGenerated"
           />
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Plan Result Modal -->
-    <Transition name="fade">
-      <div v-if="showPlanResult" class="drawer-overlay" @click.self="showPlanResult = false">
-        <div class="drawer plan-drawer">
-          <div class="drawer-header">
-            <h2 class="drawer-title">{{ t('knowledge.generatedPlan') }}</h2>
-            <button class="btn-icon" @click="showPlanResult = false" :aria-label="t('common.close')">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <div class="drawer-body plan-body">
-            <PlanResultView v-if="planResult" :plan="planResult" />
-          </div>
         </div>
       </div>
     </Transition>
@@ -267,12 +226,6 @@ function onPlanGenerated(plan: any) {
       :show="showUploadModal"
       @close="showUploadModal = false"
       @uploaded="loadData"
-    />
-
-    <GeneratePlanModal
-      :show="showGenerateModal"
-      :docs="docs.filter(d => d.category === 'PLANNER_FILE')"
-      @close="showGenerateModal = false"
     />
   </div>
 </template>

@@ -20,9 +20,14 @@ const tabs = [
 
 const activeTab = ref<string>((route.query.tab as string) || 'chat')
 
-watch(activeTab, (val) => {
-  router.replace({ query: { ...route.query, tab: val } })
-})
+function selectTab(id: string) {
+  if (id === 'knowledge') {
+    router.push('/knowledge')
+    return
+  }
+  activeTab.value = id
+  router.replace({ query: { ...route.query, tab: id } })
+}
 
 watch(() => route.query.tab, (val) => {
   if (val && tabs.some(t => t.id === val)) {
@@ -41,16 +46,16 @@ watch(() => route.query.tab, (val) => {
 
     <div class="divider-y delay-4 animate-slide-up"></div>
 
-    <div class="mode-tabs delay-4 animate-slide-up">
+    <div class="ai-tabs delay-4 animate-slide-up">
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        class="mode-tab"
+        class="ai-tab"
         :class="{ active: activeTab === tab.id }"
-        @click="activeTab = tab.id"
+        @click="selectTab(tab.id)"
       >
         <span class="tab-icon">{{ tab.icon }}</span>
-        {{ tab.label }}
+        <span class="tab-label">{{ tab.label }}</span>
       </button>
     </div>
 
@@ -78,21 +83,58 @@ watch(() => route.query.tab, (val) => {
           </router-link>
         </div>
       </div>
-
-      <div v-else-if="activeTab === 'knowledge'" class="knowledge-entry">
-        <div class="knowledge-card">
-          <h3>{{ t('aiAssistant.knowledgeTitle') }}</h3>
-          <p>{{ t('aiAssistant.knowledgeDesc') }}</p>
-          <router-link to="/knowledge" class="editorial-btn">
-            {{ t('aiAssistant.openKnowledgeManager') }}
-          </router-link>
-        </div>
-      </div>
     </div>
   </main>
 </template>
 
 <style scoped>
+.ai-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 100px;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-tab:hover {
+  border-color: var(--text-h);
+  color: var(--text-h);
+}
+
+.ai-tab.active {
+  background: var(--text-h);
+  border-color: var(--text-h);
+  color: var(--bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.tab-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.tab-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 .ai-content {
   flex: 1;
   display: flex;
@@ -118,41 +160,22 @@ watch(() => route.query.tab, (val) => {
   text-align: center;
 }
 
-.knowledge-entry {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
+@media (max-width: 480px) {
+  .ai-tabs {
+    gap: 0.5rem;
+  }
 
-.knowledge-card {
-  max-width: 480px;
-  text-align: center;
-  padding: 2rem;
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
+  .ai-tab {
+    min-width: 80px;
+    padding: 0.65rem 0.75rem;
+  }
 
-.knowledge-card h3 {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-serif);
-  color: var(--text-h);
-}
+  .tab-icon {
+    font-size: 1.25rem;
+  }
 
-.knowledge-card p {
-  margin: 0 0 1.5rem;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.tab-icon {
-  margin-right: 0.35rem;
-}
-
-.mode-tab {
-  display: inline-flex;
-  align-items: center;
+  .tab-label {
+    font-size: 0.7rem;
+  }
 }
 </style>
