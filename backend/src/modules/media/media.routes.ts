@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
 import { saveMediaFile, getAbsoluteStoragePath } from '../../lib/storage.js'
+import { validateBufferMimeType } from '../../lib/file-type.js'
 import { validateBody, z } from '../../lib/validate.js'
 import fs from 'fs'
 import path from 'path'
@@ -67,7 +68,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     const ext = path.extname(data.filename).toLowerCase()
     const isVideo = VIDEO_EXTS.includes(ext)
     const maxSize = isVideo ? VIDEO_MAX_SIZE : PHOTO_MAX_SIZE
-    let type: string = isVideo ? 'VIDEO' : 'PHOTO'
+    const type: string = isVideo ? 'VIDEO' : 'PHOTO'
 
     // Try to get metadata from fields if any
     let rawMeta: any = {}
@@ -90,16 +91,44 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     const month = takenAt ? takenAt.getMonth() + 1 : new Date().getMonth() + 1
     const personTagIds: string[] = meta.personTagIds || []
 
-    const mimeType = data.mimetype
+    // Read and validate the file content before persisting anything.
+    const chunks: Buffer[] = []
+    let streamingSize = 0
+    for await (const chunk of data.file) {
+      streamingSize += chunk.length
+      if (streamingSize > maxSize) {
+        return reply.code(400).send({
+          error: {
+            code: 'FILE_TOO_LARGE',
+            message: `File exceeds maximum size of ${maxSize / 1024 / 1024}MB`
+          }
+        })
+      }
+      chunks.push(chunk)
+    }
 
-    // 1. Create initial DB record to get an ID
+    const buffer = Buffer.concat(chunks)
+    if (buffer.length === 0) {
+      return reply.code(400).send({ error: { code: 'EMPTY_FILE', message: 'Uploaded file is empty' } })
+    }
+
+    const contentCheck = await validateBufferMimeType(buffer, isVideo ? ALLOWED_VIDEO_TYPES : ALLOWED_PHOTO_TYPES)
+    if (!contentCheck.valid) {
+      return reply.code(400).send({
+        error: {
+          code: 'INVALID_FILE_CONTENT',
+          message: `File content does not match allowed ${isVideo ? 'video' : 'photo'} type (detected: ${contentCheck.detected || 'unknown'})`
+        }
+      })
+    }
+
     const user = request.user
     const media = await prisma.mediaAsset.create({
       data: {
         type,
         originalFilename: data.filename,
         storagePath: '', // Will update later
-        mimeType,
+        mimeType: data.mimetype,
         sizeBytes: 0,    // Will update later
         takenAt,
         year,
@@ -108,22 +137,10 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     })
 
     try {
-      // 2. Save file
-      const { storagePath, sha256, sizeBytes } = await saveMediaFile(data, media.id, year, month)
+      // Save file
+      const { storagePath, sizeBytes } = await saveMediaFile(buffer, data.filename, media.id, year, month)
 
-      if (sizeBytes > maxSize) {
-        const absPath = getAbsoluteStoragePath(storagePath)
-        if (fs.existsSync(absPath)) fs.unlinkSync(absPath)
-        await prisma.mediaAsset.delete({ where: { id: media.id } }).catch(() => {})
-        return reply.code(400).send({
-          error: {
-            code: 'FILE_TOO_LARGE',
-            message: `File exceeds maximum size of ${maxSize / 1024 / 1024}MB`
-          }
-        })
-      }
-
-      // 3. Update DB record
+      // Update DB record
       await prisma.mediaAsset.update({
         where: { id: media.id },
         data: {

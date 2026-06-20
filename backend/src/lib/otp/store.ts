@@ -1,60 +1,53 @@
 import crypto from 'crypto'
+import { prisma } from '../prisma.js'
 
 export type OtpType = 'email' | 'phone'
 
-interface OtpRecord {
-  type: OtpType
-  target: string
-  code: string
-  attempts: number
-  expiresAt: number
-}
-
 const CODE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const MAX_ATTEMPTS = 3
-
-const otps = new Map<string, OtpRecord>()
 
 function now() {
   return Date.now()
 }
 
 function cleanup() {
-  const t = now()
-  for (const [id, record] of otps) {
-    if (t > record.expiresAt) {
-      otps.delete(id)
-    }
-  }
+  const cutoff = new Date(now())
+  prisma.otpCode.deleteMany({ where: { expiresAt: { lt: cutoff } } }).catch(() => {})
 }
 
 // Lightweight periodic cleanup (every 5 minutes)
 setInterval(cleanup, 5 * 60 * 1000).unref()
 
 function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  return String(crypto.randomInt(100000, 1000000))
 }
 
-export function createOtp(type: OtpType, target: string): { id: string; code: string; expiresIn: number } {
+export async function createOtp(type: OtpType, target: string): Promise<{ id: string; code: string; expiresIn: number }> {
   const id = crypto.randomUUID()
   const code = generateCode()
-  otps.set(id, {
-    type,
-    target: target.toLowerCase().trim(),
-    code,
-    attempts: 0,
-    expiresAt: now() + CODE_TTL_MS
+
+  await prisma.otpCode.create({
+    data: {
+      id,
+      type,
+      target: target.toLowerCase().trim(),
+      code,
+      attempts: 0,
+      expiresAt: new Date(now() + CODE_TTL_MS)
+    }
   })
+
   return { id, code, expiresIn: CODE_TTL_MS }
 }
 
-export function verifyOtp(id: string | undefined, target: string, code: string | undefined): boolean {
+export async function verifyOtp(id: string | undefined, target: string, code: string | undefined): Promise<boolean> {
   if (!id || !code) return false
-  const record = otps.get(id)
+
+  const record = await prisma.otpCode.findUnique({ where: { id } })
   if (!record) return false
 
-  if (now() > record.expiresAt) {
-    otps.delete(id)
+  if (now() > record.expiresAt.getTime()) {
+    await prisma.otpCode.delete({ where: { id } }).catch(() => {})
     return false
   }
 
@@ -62,20 +55,21 @@ export function verifyOtp(id: string | undefined, target: string, code: string |
     return false
   }
 
-  record.attempts++
-  if (record.attempts > MAX_ATTEMPTS) {
-    otps.delete(id)
+  const attempts = record.attempts + 1
+  if (attempts > MAX_ATTEMPTS) {
+    await prisma.otpCode.delete({ where: { id } }).catch(() => {})
     return false
   }
 
   if (record.code !== code.trim()) {
+    await prisma.otpCode.update({ where: { id }, data: { attempts } })
     return false
   }
 
-  otps.delete(id)
+  await prisma.otpCode.delete({ where: { id } }).catch(() => {})
   return true
 }
 
-export function getOtpForTest(id: string): OtpRecord | undefined {
-  return otps.get(id)
+export async function getOtpForTest(id: string) {
+  return prisma.otpCode.findUnique({ where: { id } })
 }

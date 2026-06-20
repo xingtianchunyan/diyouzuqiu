@@ -10,64 +10,80 @@ export interface User {
   memberId: string | null
 }
 
-export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
-  const user = ref<User | null>(null)
-  
-  const isAuthenticated = computed(() => !!accessToken.value)
+const REFRESH_INTERVAL_MS = 50 * 60 * 1000 // 50 minutes
 
-  const setTokens = (access: string) => {
-    accessToken.value = access
-    localStorage.setItem('accessToken', access)
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<User | null>(null)
+  const initialized = ref(false)
+  let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+  const isAuthenticated = computed(() => !!user.value)
+
+  function startRefreshTimer() {
+    stopRefreshTimer()
+    refreshTimer = setInterval(() => {
+      refreshToken().catch(() => {
+        // If the background refresh fails the next API call will get a 401
+        // and the response interceptor will redirect to login.
+      })
+    }, REFRESH_INTERVAL_MS)
+  }
+
+  function stopRefreshTimer() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
   }
 
   const setUser = (userData: User) => {
     user.value = userData
+    startRefreshTimer()
   }
 
-  const logout = () => {
-    accessToken.value = null
+  const logout = async () => {
+    stopRefreshTimer()
+    try {
+      await apiClient.post('/auth/logout', {})
+    } catch {
+      // Ignore logout errors; the cookie will expire anyway.
+    }
     user.value = null
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken') // Clean up old data if exists
   }
 
   const fetchCurrentUser = async () => {
-    if (!accessToken.value) return null
-    try {
-      const response = await apiClient.get<User>('/me')
-      user.value = response.data
-      return response.data
-    } catch (error) {
-      logout()
-      throw error
-    }
+    const response = await apiClient.get<User>('/me')
+    user.value = response.data
+    return response.data
   }
 
   const refreshToken = async () => {
+    const response = await apiClient.post('/auth/refresh', {})
+    return response.data.token as string
+  }
+
+  const initialize = async () => {
+    if (initialized.value) return
     try {
-      const response = await apiClient.post('/auth/refresh', {})
-      
-      const newAccess = response.data.token
-      if (newAccess) {
-        setTokens(newAccess)
-        return newAccess
-      }
-      throw new Error('No token returned from refresh')
-    } catch (error) {
-      logout()
-      throw error
+      await fetchCurrentUser()
+      // Rotate the cookie immediately so the session is fresh.
+      await refreshToken()
+      startRefreshTimer()
+    } catch {
+      user.value = null
+    } finally {
+      initialized.value = true
     }
   }
 
   return {
-    accessToken,
     user,
+    initialized,
     isAuthenticated,
-    setTokens,
     setUser,
     logout,
     fetchCurrentUser,
-    refreshToken
+    refreshToken,
+    initialize
   }
 })

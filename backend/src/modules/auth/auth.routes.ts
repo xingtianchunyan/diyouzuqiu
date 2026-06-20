@@ -80,7 +80,7 @@ async function buildLoginResponse(
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
   app.get('/auth/captcha', async (request, reply) => {
-    const captcha = createCaptcha()
+    const captcha = await createCaptcha()
     return {
       id: captcha.id,
       question: captcha.question
@@ -104,13 +104,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       captchaAnswer?: string
     }
 
-    if (requiresCaptcha(ip)) {
-      if (!verifyCaptcha(captchaId, captchaAnswer)) {
+    if (await requiresCaptcha(ip)) {
+      if (!(await verifyCaptcha(captchaId, captchaAnswer))) {
         return reply.code(403).send({
           error: {
             code: 'CAPTCHA_REQUIRED',
             message: 'Captcha required after repeated failed login attempts',
-            failures: failureCount(ip)
+            failures: await failureCount(ip)
           }
         })
       }
@@ -118,40 +118,27 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
-      recordFailure(ip)
+      await recordFailure(ip)
       return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' } })
     }
 
     const isValid = await bcrypt.compare(password, user.password)
     if (!isValid) {
-      recordFailure(ip)
+      await recordFailure(ip)
       return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' } })
     }
 
-    clearFailures(ip)
+    await clearFailures(ip)
     return buildLoginResponse(app, reply, user)
   })
 
-  app.post('/auth/refresh', async (request, reply) => {
-    const auth = request.headers.authorization || ''
-    if (!auth.startsWith('Bearer ')) {
-      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'No Authorization header' } })
-    }
-
-    const rawToken = auth.slice('Bearer '.length).trim()
-    let payload: any
-    try {
-      payload = app.jwt.verify(rawToken)
-    } catch (err) {
-      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } })
-    }
-
+  app.post('/auth/refresh', { preValidation: [app.authenticate] }, async (request, reply) => {
     const user = await prisma.user.findUnique({
-      where: { id: payload.id },
+      where: { id: request.user.id },
       select: { id: true, email: true, phone: true, role: true, memberId: true, tokenVersion: true }
     })
-    if (!user || user.tokenVersion !== payload.tokenVersion) {
-      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Invalid or revoked token' } })
+    if (!user) {
+      return reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'User not found' } })
     }
 
     const token = signUserToken(app, user)
@@ -223,7 +210,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
   }, async (request, reply) => {
     const { email } = (request as any).validatedBody as { email: string }
-    const { id, code, expiresIn } = createOtp('email', email)
+    const { id, code, expiresIn } = await createOtp('email', email)
 
     try {
       await otpSender.send({ type: 'email', target: email, code })
@@ -255,13 +242,18 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       code: string
     }
 
-    if (!verifyOtp(codeId, email, code)) {
+    if (!(await verifyOtp(codeId, email, code))) {
       return reply.code(401).send({ error: { code: 'INVALID_OTP', message: 'Invalid or expired verification code' } })
     }
 
     let user = await prisma.user.findUnique({ where: { email } })
 
     if (!user) {
+      const autoRegisterEnabled = process.env.OTP_AUTO_REGISTER !== 'false'
+      if (!autoRegisterEnabled) {
+        return reply.code(401).send({ error: { code: 'USER_NOT_FOUND', message: 'No account found for this email' } })
+      }
+
       // Auto-register new users via email OTP
       const randomPassword = await bcrypt.hash(crypto.randomUUID(), 10)
       user = await prisma.user.create({

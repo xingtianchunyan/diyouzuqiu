@@ -18,66 +18,40 @@ export const ensureDir = async (dirPath: string) => {
 }
 
 /**
- * Saves a stream to a temporary file, calculates SHA256,
- * and then moves it to the final destination based on year/month.
+ * Saves a media buffer to the final destination based on year/month,
+ * calculates SHA256, and returns storage metadata.
  */
 export async function saveMediaFile(
-  file: MultipartFile,
+  buffer: Buffer,
+  filename: string,
   id: string,
   year: number,
   month: number
 ): Promise<{ storagePath: string; sha256: string; sizeBytes: number }> {
-  const tempDir = path.join(STORAGE_ROOT, 'temp')
-  await ensureDir(tempDir)
-
-  const tempFilePath = path.join(tempDir, `${id}_temp`)
-  const hash = crypto.createHash('sha256')
-  
-  // Create write stream
-  const writeStream = fs.createWriteStream(tempFilePath)
-  
-  let sizeBytes = 0
-
-  // We can pipe and hash at the same time using streams, but for simplicity:
-  for await (const chunk of file.file) {
-    writeStream.write(chunk)
-    hash.update(chunk)
-    sizeBytes += chunk.length
-  }
-  
-  writeStream.end()
-  
-  // wait for stream to finish
-  await new Promise<void>((resolve, reject) => {
-    writeStream.on('finish', () => resolve())
-    writeStream.on('error', reject)
-  })
-
-  const sha256 = hash.digest('hex')
+  const sha256 = crypto.createHash('sha256').update(buffer).digest('hex')
 
   // Calculate final path
   // Format: media/original/{yyyy}/{mm}/{id}_{sha256}.{ext}
-  const ext = path.extname(file.filename) || ''
-  
+  const ext = path.extname(filename) || ''
+
   const yyyy = year.toString()
   const mm = month.toString().padStart(2, '0')
   const relativeDir = path.join('media', 'original', yyyy, mm)
   const finalDir = path.join(STORAGE_ROOT, relativeDir)
-  
+
   await ensureDir(finalDir)
 
   const finalFilename = `${id}_${sha256}${ext}`
   const relativeStoragePath = path.join(relativeDir, finalFilename)
   const finalFilePath = path.join(STORAGE_ROOT, relativeStoragePath)
 
-  // Move file from temp to final
-  await fs.promises.rename(tempFilePath, finalFilePath)
+  await fs.promises.writeFile(finalFilePath, buffer)
 
   // Normalize path separators to forward slashes for the database
   return {
     storagePath: relativeStoragePath.replace(/\\/g, '/'),
     sha256,
-    sizeBytes
+    sizeBytes: buffer.length
   }
 }
 

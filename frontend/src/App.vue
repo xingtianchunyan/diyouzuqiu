@@ -14,12 +14,10 @@ const router = useRouter()
 const route = useRoute()
 
 onMounted(async () => {
-  if (authStore.isAuthenticated) {
-    try {
-      await authStore.fetchCurrentUser()
-    } catch (err) {
-      // Silent: auth guard will redirect if needed
-    }
+  try {
+    await authStore.initialize()
+  } catch (err) {
+    // Silent: auth guard will redirect if needed
   }
 })
 

@@ -24,7 +24,6 @@ import { prisma } from './lib/prisma.js'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 import { STORAGE_ROOT } from './lib/storage.js'
-import { deepEscapeHtml } from './lib/xss.js'
 
 function getCorsOrigin(): boolean | string | string[] {
   const raw = process.env.CORS_ORIGIN
@@ -116,36 +115,6 @@ export async function buildApp(): Promise<FastifyInstance> {
       return reply.code(statusCode).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' } })
     }
     return reply.code(statusCode).send(error)
-  })
-
-  // Global XSS output filtering for JSON responses.
-  // AI endpoints (planner) set config.skipXssEscape = true to preserve markdown/HTML.
-  app.addHook('onSend', async (request, reply, payload) => {
-    if ((request.routeOptions.config as any).skipXssEscape) {
-      return payload
-    }
-    if (payload === null || payload === undefined) {
-      return payload
-    }
-
-    let data: any
-    if (typeof payload === 'string') {
-      const trimmed = payload.trim()
-      if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-        return payload
-      }
-      try {
-        data = JSON.parse(trimmed)
-      } catch {
-        return payload
-      }
-    } else {
-      data = payload
-    }
-
-    const escaped = deepEscapeHtml(data)
-    reply.type('application/json')
-    return JSON.stringify(escaped)
   })
 
   app.register(async (api) => {

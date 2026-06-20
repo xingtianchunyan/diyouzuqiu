@@ -125,8 +125,7 @@ export const plannerRoutes: FastifyPluginAsync = async (app) => {
       rateLimit: {
         max: 10,
         timeWindow: '1 minute'
-      },
-      skipXssEscape: true
+      }
     }
   }, async (request, reply) => {
     const { constraints } = (request as any).validatedBody as { constraints: PlannerConstraints }
@@ -203,8 +202,7 @@ ${docs.map((d: any) => `[引用文档 ${d.title}]\n${d.content}`).join('\n\n')}
       rateLimit: {
         max: 20,
         timeWindow: '1 minute'
-      },
-      skipXssEscape: true
+      }
     }
   }, async (request, reply) => {
     const { messages, plannerProjectId } = (request as any).validatedBody as { messages: ChatMessage[]; plannerProjectId?: string }

@@ -194,9 +194,8 @@ const handleLogin = async () => {
       response = await authService.loginWithEmailOtp(email.value, codeId.value, code.value)
     }
 
-    const { token, user } = response.data
+    const { user } = response.data
 
-    authStore.setTokens(token)
     authStore.setUser(user)
 
     router.push('/')

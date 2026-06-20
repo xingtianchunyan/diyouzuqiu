@@ -251,3 +251,38 @@ model KnowledgeChunk {
 
   @@index([knowledgeDocId])
 }
+
+// Persistent security state: login failures, captchas and OTP codes.
+// Previously stored in memory, which lost state on restart and did not scale.
+
+model LoginAttempt {
+  id              String   @id @default(cuid())
+  ip              String   @unique
+  failures        Int      @default(0)
+  lastFailureAt   DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([lastFailureAt])
+}
+
+model Captcha {
+  id        String   @id @default(cuid())
+  answer    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  type      String
+  target    String
+  code      String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([target])
+}

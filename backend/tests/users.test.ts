@@ -244,9 +244,9 @@ describe('Admin User Management', () => {
     })
     expect(membersRes.statusCode).toBe(200)
     // The leading apostrophe is HTML-escaped by the global XSS output filter
-    const member = membersRes.json().find((m: any) => m.displayName.startsWith('&#39;='))
+    const member = membersRes.json().find((m: any) => m.displayName.startsWith("'="))
     expect(member).toBeDefined()
-    expect(member.displayName).toBe('&#39;=cmd|&#39;/C calc&#39;!A0')
+    expect(member.displayName).toBe("'=cmd|'/C calc'!A0")
 
     const familiesRes = await app.inject({
       method: 'GET',
@@ -254,8 +254,8 @@ describe('Admin User Management', () => {
       headers: { authorization: `Bearer ${token}` }
     })
     expect(familiesRes.statusCode).toBe(200)
-    const family = familiesRes.json().find((f: any) => f.label.startsWith('&#39;@'))
+    const family = familiesRes.json().find((f: any) => f.label.startsWith("'@"))
     expect(family).toBeDefined()
-    expect(family.label).toBe('&#39;@SUM(A1:A10)')
+    expect(family.label).toBe("'@SUM(A1:A10)")
   })
 })

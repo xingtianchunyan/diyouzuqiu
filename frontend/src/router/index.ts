@@ -40,6 +40,7 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+  await authStore.initialize()
   const isAuthenticated = authStore.isAuthenticated
 
   if (!isAuthenticated && !to.meta.public) {

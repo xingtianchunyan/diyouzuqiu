@@ -17,6 +17,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@diyouzuqiu.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - OTP_AUTO_REGISTER=${OTP_AUTO_REGISTER:-true}
       - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN is required}
       - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
       - SMTP_PORT=${SMTP_PORT:-587}

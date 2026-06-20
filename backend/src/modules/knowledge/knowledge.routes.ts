@@ -271,8 +271,7 @@ export const knowledgeRoutes: FastifyPluginAsync = async (app) => {
   app.post('/knowledge/chat', {
     preValidation: [app.authenticate, validateBody(knowledgeChatSchema)],
     config: {
-      rateLimit: { max: 20, timeWindow: '1 minute' },
-      skipXssEscape: true
+      rateLimit: { max: 20, timeWindow: '1 minute' }
     }
   }, async (request, reply) => {
     const { messages, plannerProjectId } = (request as any).validatedBody as { messages: ChatMessage[]; plannerProjectId?: string }
@@ -336,8 +335,7 @@ ${docs.map((d: any) => `[${d.title}]\n${d.content.substring(0, 1000)}`).join('\n
   app.post('/knowledge/generate-plan', {
     preValidation: [app.authenticate, validateBody(generatePlanSchema)],
     config: {
-      rateLimit: { max: 10, timeWindow: '1 minute' },
-      skipXssEscape: true
+      rateLimit: { max: 10, timeWindow: '1 minute' }
     }
   }, async (request, reply) => {
     const { docIds, constraints } = (request as any).validatedBody as { docIds?: string[]; constraints?: any }

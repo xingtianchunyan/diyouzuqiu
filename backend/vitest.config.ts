@@ -10,5 +10,7 @@ export default defineConfig({
     hookTimeout: 30000,
     pool: 'forks',
     singleFork: true,
+    // All test files share the same SQLite database, so they must run sequentially.
+    fileParallelism: false,
   },
 })

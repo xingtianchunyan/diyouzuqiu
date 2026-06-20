@@ -133,8 +133,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.post('/batch', {
-    preValidation: validateBody(batchCreateUsersSchema),
-    config: { skipXssEscape: true }
+    preValidation: validateBody(batchCreateUsersSchema)
   }, async (request, reply) => {
     const { users } = (request as any).validatedBody as {
       users: Array<{

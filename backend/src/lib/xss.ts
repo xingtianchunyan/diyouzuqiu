@@ -6,12 +6,6 @@ const ESCAPE_MAP: Record<string, string> = {
   "'": '&#39;'
 }
 
-declare module 'fastify' {
-  interface FastifyContextConfig {
-    skipXssEscape?: boolean
-  }
-}
-
 export function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (char) => ESCAPE_MAP[char])
 }

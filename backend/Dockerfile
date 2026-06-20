@@ -31,6 +31,7 @@ USER node
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOST=0.0.0.0
 ENV DATABASE_URL=file:/data/db/diyou.db
 ENV STORAGE_ROOT=/data/storage
 # JWT_SECRET must be provided at runtime; do not hardcode defaults in the image.
