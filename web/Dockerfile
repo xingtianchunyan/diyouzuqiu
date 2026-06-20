@@ -2,11 +2,15 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-# Install frontend dependencies and build
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend ./
-RUN npm run build
+# The root package-lock.json is the single source of truth for this monorepo.
+# Copy root lockfile plus the frontend workspace manifest before installing.
+COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+RUN npm ci -w frontend
+
+# Copy frontend source and build
+COPY frontend ./frontend
+RUN npm run -w frontend build
 
 # Production image: Caddy serves the static frontend
 FROM caddy:2-alpine
@@ -19,7 +23,7 @@ USER root
 RUN mkdir -p /config/caddy /data/caddy /srv && \
     chown -R caddy:caddy /srv /config /data
 
-COPY --from=builder --chown=caddy:caddy /app/dist /srv
+COPY --from=builder --chown=caddy:caddy /app/frontend/dist /srv
 COPY --chown=caddy:caddy web/Caddyfile /etc/caddy/Caddyfile
 
 # Run as non-root user
