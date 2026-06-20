@@ -1,56 +1,11 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { knowledgeService, type ChatMessage } from '../api/services/knowledge.service'
-import { parseService } from '../api/services/parse.service'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { aiService } from '../api/services/ai.service'
+import ChatPanel from '../components/knowledge/ChatPanel.vue'
+import PlanResultView from '../components/knowledge/PlanResultView.vue'
 
 const { t } = useI18n()
-
-const inputMessage = ref('')
-const loading = ref(false)
-const fileLoading = ref(false)
-const STORAGE_KEY = 'planner_chat_history'
-
-const defaultMessages: (ChatMessage & { isSystem?: boolean, parsedPlan?: any })[] = [
-  { role: 'assistant', content: t('planner.greeting') }
-]
-
-const messages = ref<(ChatMessage & { isSystem?: boolean, parsedPlan?: any })[]>([...defaultMessages])
-const messagesContainer = ref<HTMLElement | null>(null)
-
-// Initialize from localStorage
-onMounted(() => {
-  const cached = localStorage.getItem(STORAGE_KEY)
-  if (cached) {
-    try {
-      messages.value = JSON.parse(cached)
-    } catch (e) {
-      // Invalid cache: ignore and use default messages
-    }
-  }
-})
-
-// Save to localStorage when messages change
-watch(messages, (newVal) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
-}, { deep: true })
-
-const clearHistory = () => {
-  if (confirm(t('confirm.clearChatHistory'))) {
-    messages.value = [...defaultMessages]
-    localStorage.removeItem(STORAGE_KEY)
-  }
-}
-
-const resultTabs = [
-  { id: 'plan' },
-  { id: 'budget' },
-  { id: 'prizes' },
-  { id: 'speech' }
-]
-const activeResultTab = ref('plan')
 
 const modeTabs = [
   { id: 'chat' },
@@ -70,91 +25,15 @@ const plannerForm = ref({
   notes: ''
 })
 const formLoading = ref(false)
+const currentPlan = ref<any>(null)
+const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
 
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-    }
-  })
+const clearHistory = () => {
+  chatPanelRef.value?.clearHistory()
 }
 
-const renderMarkdown = (text: string) => {
-  return DOMPurify.sanitize(marked.parse(text) as string)
-}
-
-const parsePotentialJson = (text: string) => {
-  try {
-    let cleanText = text.trim()
-    if (cleanText.startsWith('```json')) {
-      cleanText = cleanText.replace(/^```json\n/, '').replace(/\n```$/, '')
-    } else if (cleanText.startsWith('```')) {
-      cleanText = cleanText.replace(/^```\n/, '').replace(/\n```$/, '')
-    }
-    const parsed = JSON.parse(cleanText)
-    if (parsed.plan && parsed.budget && parsed.prizes && parsed.speech) {
-      return parsed
-    }
-  } catch (e) {
-    // Not valid JSON
-  }
-  return null
-}
-
-const saveToKnowledge = async (msgContent: string) => {
-  if (!msgContent) return
-  
-  try {
-    // Determine a brief title from content
-    const briefTitle = msgContent.substring(0, 20).replace(/\n/g, ' ') + '...'
-    await knowledgeService.createKnowledge({
-      title: t('planner.savedChatTitle', { title: briefTitle }),
-      content: msgContent,
-      category: 'PLANNER_CHAT'
-    })
-    alert(t('planner.saveSuccess'))
-  } catch (err: any) {
-    alert(t('planner.saveError', { msg: err.message }))
-  }
-}
-
-const sendMessage = async () => {
-  const content = inputMessage.value.trim()
-  if (!content || loading.value) return
-
-  inputMessage.value = ''
-  messages.value.push({ role: 'user', content })
-  scrollToBottom()
-
-  loading.value = true
-  
-  try {
-    // Limit to the last 10 messages (approx 5 rounds) to prevent token overflow
-    const chatHistory = messages.value
-      .filter(m => !m.isSystem)
-      .map(m => ({ role: m.role, content: m.content }))
-      .slice(-10)
-
-    const res = await knowledgeService.chatPlanner(chatHistory)
-    const rawContent = res.data.response
-    
-    const parsedPlan = parsePotentialJson(rawContent)
-    
-    messages.value.push({ 
-      role: 'assistant', 
-      content: rawContent,
-      parsedPlan 
-    })
-  } catch (err: any) {
-    messages.value.push({ 
-      role: 'system', 
-      content: t('planner.requestError', { msg: err.response?.data?.error?.message || err.message }),
-      isSystem: true
-    })
-  } finally {
-    loading.value = false
-    scrollToBottom()
-  }
+const onPlanGenerated = (plan: any) => {
+  currentPlan.value = plan
 }
 
 const submitPlannerForm = async () => {
@@ -179,59 +58,13 @@ const submitPlannerForm = async () => {
       ...(plannerForm.value.notes ? { notes: plannerForm.value.notes } : {})
     }
 
-    const res = await knowledgeService.generateAnnualPlan(constraints)
-    const plan = res.data.plan
-    messages.value.push({
-      role: 'assistant',
-      content: JSON.stringify(plan),
-      parsedPlan: plan
-    })
+    const res = await aiService.generate('planner', { constraints })
+    currentPlan.value = res.data.plan
     activeMode.value = 'chat'
-    scrollToBottom()
   } catch (err: any) {
     alert(t('planner.generateError', { msg: err.response?.data?.error?.message || err.message }))
   } finally {
     formLoading.value = false
-  }
-}
-
-const handleFileUpload = async (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-
-  fileLoading.value = true
-  const filename = file.name
-  
-  try {
-    // 1. Parse text from file
-    const parseRes = await parseService.parse({ file })
-    const content = parseRes.data.content || parseRes.data.description
-    
-    if (!content) throw new Error(t('planner.extractContentError'))
-    
-    // 2. Save to knowledge base
-    await knowledgeService.createKnowledge({ 
-      title: filename, 
-      content,
-      category: 'PLANNER_FILE' 
-    })
-    
-    messages.value.push({
-      role: 'system',
-      content: t('planner.fileUploadSuccess', { filename }),
-      isSystem: true
-    })
-  } catch (err: any) {
-    messages.value.push({
-      role: 'system',
-      content: t('planner.fileUploadError', { msg: err.message }),
-      isSystem: true
-    })
-  } finally {
-    fileLoading.value = false
-    scrollToBottom()
-    // Reset file input
-    ;(e.target as HTMLInputElement).value = ''
   }
 }
 </script>
@@ -262,80 +95,22 @@ const handleFileUpload = async (e: Event) => {
     </div>
 
     <div class="chat-container delay-4 animate-slide-up">
-      <!-- Chat Messages -->
-      <div v-if="activeMode === 'chat'" class="chat-messages" ref="messagesContainer">
-        <div 
-          v-for="(msg, index) in messages" 
-          :key="index" 
-          class="chat-bubble-wrapper"
-          :class="msg.role"
-        >
-          <div v-if="msg.isSystem" class="system-message">
-            {{ msg.content }}
-          </div>
-          <div v-else class="chat-bubble">
-            <div class="bubble-header">
-              <span>{{ msg.role === 'user' ? t('planner.role.user') : t('planner.role.assistant') }}</span>
-              <button 
-                v-if="msg.role === 'assistant'" 
-                class="btn-text micro" 
-                @click="saveToKnowledge(msg.content)"
-                :title="t('planner.saveToKnowledgeTooltip')"
-              >
-                {{ t('planner.saveToKnowledge') }}
-              </button>
-            </div>
-            
-            <!-- Render Rich Tabs if JSON plan is parsed -->
-            <div v-if="msg.parsedPlan" class="plan-result">
-              <div class="tabs-nav">
-                <button 
-                  v-for="tab in resultTabs" 
-                  :key="tab.id"
-                  class="tab-btn" 
-                  :class="{ active: activeResultTab === tab.id }"
-                  @click="activeResultTab = tab.id"
-                >
-                  {{ $t('planner.tabs.' + tab.id) }}
-                </button>
-              </div>
-              <div class="plan-block-content markdown-body" v-html="renderMarkdown(msg.parsedPlan[activeResultTab])"></div>
-            </div>
-            
-            <!-- Otherwise render normal markdown text -->
-            <div v-else class="bubble-content markdown-body" v-html="renderMarkdown(msg.content)"></div>
-          </div>
+      <!-- Chat -->
+      <div v-if="activeMode === 'chat'" class="chat-mode-area">
+        <ChatPanel
+          ref="chatPanelRef"
+          class="planner-chat-panel"
+          context="planner"
+          :show-header="false"
+          :show-upload="true"
+          :show-save-to-knowledge="true"
+          :enable-history-cache="true"
+          storage-key="planner_chat_history"
+          @plan="onPlanGenerated"
+        />
+        <div v-if="currentPlan" class="plan-result-area">
+          <PlanResultView :plan="currentPlan" />
         </div>
-        
-        <div v-if="loading" class="chat-bubble-wrapper assistant">
-          <div class="chat-bubble">
-            <div class="bubble-header">{{ t('planner.role.assistant') }}</div>
-            <div class="typing-indicator">
-              <span></span><span></span><span></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chat Input -->
-      <div v-if="activeMode === 'chat'" class="chat-input-area">
-        <form @submit.prevent="sendMessage" class="chat-form">
-          <label class="upload-btn" :class="{ disabled: fileLoading }" :title="t('planner.uploadDocumentTooltip')">
-            <input type="file" @change="handleFileUpload" accept=".txt,.pdf,.docx,.doc" :disabled="fileLoading" hidden />
-            <span v-if="fileLoading" class="spinner-small"></span>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-          </label>
-          <input 
-            v-model="inputMessage" 
-            type="text" 
-            class="chat-input" 
-            :placeholder="t('planner.inputPlaceholder')" 
-            :disabled="loading"
-          />
-          <button type="submit" class="send-btn" :disabled="!inputMessage.trim() || loading">
-            {{ t('planner.send') }}
-          </button>
-        </form>
       </div>
 
       <!-- Structured Form -->
@@ -775,5 +550,25 @@ const handleFileUpload = async (e: Event) => {
 .planner-form .form-textarea {
   resize: vertical;
   line-height: 1.5;
+}
+
+.chat-mode-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.planner-chat-panel {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.plan-result-area {
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
 }
 </style>

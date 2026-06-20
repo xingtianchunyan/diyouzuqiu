@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { knowledgeService, type KnowledgeDoc, type PlannerConstraints } from '../../api/services/knowledge.service'
+import { type KnowledgeDoc } from '../../api/services/knowledge.service'
+import { aiService, type PlannerConstraints } from '../../api/services/ai.service'
 import PlanResultView from './PlanResultView.vue'
 
 const { t } = useI18n()
@@ -46,7 +47,10 @@ async function generate() {
         avoid: c.avoid?.filter(Boolean)
       }
     }
-    const res = await knowledgeService.generatePlanFromKnowledge(payload.docIds, payload.constraints)
+    const res = await aiService.generate('knowledge', {
+      docIds: payload.docIds,
+      constraints: payload.constraints
+    })
     result.value = res.data.plan
   } catch (err: any) {
     error.value = err.response?.data?.error?.message || t('knowledge.generateError')

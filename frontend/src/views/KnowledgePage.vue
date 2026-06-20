@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { knowledgeService, type KnowledgeDoc, type ChatMessage } from '../api/services/knowledge.service'
+import { knowledgeService, type KnowledgeDoc } from '../api/services/knowledge.service'
+import { type ChatMessage } from '../api/services/ai.service'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import ChatPanel from '../components/knowledge/ChatPanel.vue'
@@ -232,6 +233,7 @@ function onPlanGenerated(plan: any) {
 
           <ChatPanel
             v-else
+            context="knowledge"
             :title="selectedDoc?.title"
             :initial-messages="chatInitialMessages"
             @close="closeDocModal"

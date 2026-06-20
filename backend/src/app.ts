@@ -10,7 +10,7 @@ import { registerHealthModule } from './modules/health/health.module.js'
 import { authPlugin } from './plugins/auth.plugin.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { knowledgeRoutes } from './modules/knowledge/knowledge.routes.js'
-import { plannerRoutes } from './modules/planner/planner.routes.js'
+import { aiRoutes } from './modules/ai/ai.routes.js'
 import { mediaRoutes } from './modules/media/media.routes.js'
 import { familiesRoutes } from './modules/families/families.routes.js'
 import { membersRoutes } from './modules/members/members.routes.js'
@@ -126,7 +126,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(worksRoutes)
     await api.register(yearsRoutes)
     await api.register(knowledgeRoutes)
-    await api.register(plannerRoutes)
+    await api.register(aiRoutes)
     await api.register(chroniclesRoutes)
     await api.register(usersRoutes, { prefix: '/admin/users' })
     await api.register(parseRoutes)
