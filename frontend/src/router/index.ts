@@ -10,6 +10,7 @@ import PeoplePage from '../views/PeoplePage.vue'
 import PersonPage from '../views/PersonPage.vue'
 import UploadPage from '../views/UploadPage.vue'
 import PlannerPage from '../views/PlannerPage.vue'
+import AiAssistantPage from '../views/AiAssistantPage.vue'
 import LoginPage from '../views/LoginPage.vue'
 import AdminUsersPage from '../views/AdminUsersPage.vue'
 import { useAuthStore } from '../stores/auth'
@@ -28,12 +29,14 @@ export const router = createRouter({
     { path: '/people', name: 'people', component: PeoplePage },
     { path: '/people/:id', name: 'person', component: PersonPage, props: true },
     { path: '/upload', name: 'upload', component: UploadPage },
-    { path: '/planner', name: 'planner', component: PlannerPage },
+    { path: '/ai', name: 'ai-assistant', component: AiAssistantPage, meta: { requiresAuth: true } },
+    { path: '/planner', name: 'planner', component: PlannerPage, meta: { requiresAuth: true } },
     { path: '/admin/users', name: 'admin-users', component: AdminUsersPage, meta: { requiresAuth: true, requiresAdmin: true } },
     {
       path: '/knowledge',
       name: 'Knowledge',
-      component: () => import('../views/KnowledgePage.vue')
+      component: () => import('../views/KnowledgePage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
     }
   ],
 })

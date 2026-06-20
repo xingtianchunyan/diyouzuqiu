@@ -67,7 +67,8 @@ const messages = {
         works: '文集/诗集',
         people: '队员',
         upload: '上传资料',
-        planner: '年会策划'
+        planner: '年会策划',
+        aiAssistant: 'AI 助手'
       },
       admin: {
         accountManagement: '账号管理',
@@ -309,6 +310,20 @@ const messages = {
       extractContentError: '无法提取文件内容',
       fileUploadSuccess: '✅ 成功将文档《{filename}》存入知识库，AI 后续可参考此文档。',
       fileUploadError: '❌ 上传文档失败: {msg}'
+    },
+    aiAssistant: {
+      kicker: 'AI ASSISTANT',
+      title: 'AI 助手',
+      subtitle: '统一入口：自由问答、策划助手与知识库管理',
+      tabs: {
+        chat: '通用对话',
+        planner: '策划助手',
+        knowledge: '知识库管理'
+      },
+      openFullPlanner: '打开完整策划表单',
+      knowledgeTitle: '知识库管理',
+      knowledgeDesc: '管理员可在此管理策划知识文档、上传文件与生成方案。',
+      openKnowledgeManager: '进入知识库管理'
     },
     knowledge: {
       kicker: 'KNOWLEDGE BASE',
@@ -618,7 +633,8 @@ const messages = {
         works: 'Writings/Poems',
         people: 'Members',
         upload: 'Upload',
-        planner: 'Annual Plan'
+        planner: 'Annual Plan',
+        aiAssistant: 'AI Assistant'
       },
       admin: {
         accountManagement: 'Account Management',
@@ -860,6 +876,20 @@ const messages = {
       extractContentError: 'Unable to extract file content',
       fileUploadSuccess: '✅ Successfully saved document "{filename}" to the knowledge base. The AI can now reference it.',
       fileUploadError: '❌ Failed to upload document: {msg}'
+    },
+    aiAssistant: {
+      kicker: 'AI ASSISTANT',
+      title: 'AI Assistant',
+      subtitle: 'Unified entry: general chat, planning assistant and knowledge base management',
+      tabs: {
+        chat: 'General Chat',
+        planner: 'Planner',
+        knowledge: 'Knowledge Base'
+      },
+      openFullPlanner: 'Open Full Planner Form',
+      knowledgeTitle: 'Knowledge Base Management',
+      knowledgeDesc: 'Admins can manage planning knowledge documents, upload files and generate plans here.',
+      openKnowledgeManager: 'Enter Knowledge Base'
     },
     knowledge: {
       kicker: 'KNOWLEDGE BASE',

@@ -33,11 +33,10 @@ const mobileNavOptions = computed(() => {
     { label: t('app.menu.works'), value: '/works' },
     { label: t('app.menu.people'), value: '/people' },
     { label: t('app.menu.upload'), value: '/upload' },
-    { label: t('app.menu.planner'), value: '/planner' },
+    { label: t('app.menu.aiAssistant'), value: '/ai' },
   ]
   if (authStore.user?.role === 'ADMIN') {
     opts.push({ label: t('app.admin.accountManagement'), value: '/admin/users' })
-    opts.push({ label: t('app.admin.knowledgeBase'), value: '/knowledge' })
   }
   return opts
 })
@@ -49,9 +48,10 @@ const currentPath = computed(() => {
   if (path.startsWith('/works')) return '/works'
   if (path.startsWith('/people')) return '/people'
   if (path.startsWith('/upload')) return '/upload'
-  if (path.startsWith('/planner')) return '/planner'
+  if (path.startsWith('/ai')) return '/ai'
+  if (path.startsWith('/planner')) return '/ai'
+  if (path.startsWith('/knowledge')) return '/ai'
   if (path.startsWith('/admin/users')) return '/admin/users'
-  if (path.startsWith('/knowledge')) return '/knowledge'
   return ''
 })
 
@@ -78,9 +78,8 @@ const handleMobileNav = (val: string) => {
           <RouterLink class="nav-item" to="/works">{{ t('app.menu.works') }}</RouterLink>
           <RouterLink class="nav-item" to="/people">{{ t('app.menu.people') }}</RouterLink>
           <RouterLink class="nav-item" to="/upload">{{ t('app.menu.upload') }}</RouterLink>
-          <RouterLink class="nav-item" to="/planner">{{ t('app.menu.planner') }}</RouterLink>
+          <RouterLink class="nav-item" to="/ai">{{ t('app.menu.aiAssistant') }}</RouterLink>
           <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/admin/users">{{ t('app.admin.accountManagement') }}</RouterLink>
-          <RouterLink v-if="authStore.user?.role === 'ADMIN'" class="nav-item" to="/knowledge">{{ t('app.admin.knowledgeBase') }}</RouterLink>
         </nav>
 
         <div class="header-actions">
