@@ -104,6 +104,7 @@ function closeDocModal() {
 function newChat() {
   selectedDoc.value = null
   chatMode.value = true
+  activeCategory.value = 'PLANNER_CHAT'
   showDocModal.value = true
 }
 

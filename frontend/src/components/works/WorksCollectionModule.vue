@@ -55,7 +55,7 @@ const onSelectCollection = (id: string) => {
           :value="props.query"
           type="text"
           class="minimal-input"
-          :placeholder="t('app.search') + '...'"
+          :placeholder="t('common.searchPlaceholder')"
           @input="emit('update:query', ($event.target as HTMLInputElement).value)"
           @keyup.enter="emit('submit')"
           @blur="emit('submit')"

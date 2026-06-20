@@ -290,9 +290,38 @@
       <div class="warning" id="smtpWarning" style="display:none"></div>
     </div>
 
-    <!-- 步骤 6：镜像访问方式 -->
+    <!-- 步骤 6：AI 模型配置 -->
     <div class="step">
-      <h2><span class="num">6</span>镜像访问方式</h2>
+      <h2><span class="num">6</span>AI 模型配置（年会策划 / 知识库）</h2>
+      <p class="hint">AI 功能需要一个大语言模型 API Key。如果您暂时不想接入真实模型，可以选择“模拟模式”，系统会返回占位文本供您测试界面。</p>
+      <div class="field">
+        <label>AI 服务提供商</label>
+        <select id="aiProvider">
+          <option value="dashscope">阿里云 DashScope（通义千问，推荐国内用户）</option>
+          <option value="siliconflow">SiliconFlow（OpenAI 兼容）</option>
+          <option value="custom">其他 OpenAI 兼容接口</option>
+          <option value="mock">暂不配置，使用模拟模式</option>
+        </select>
+        <div class="hint" id="aiProviderHint">前往阿里云 DashScope 控制台创建 API Key：https://dashscope.console.aliyun.com/</div>
+      </div>
+      <div class="field" id="aiKeyField">
+        <label>API Key</label>
+        <input type="password" id="aiApiKey" placeholder="sk-... 或您的服务商 Key">
+        <div class="error-msg" id="aiApiKeyError">请填写 API Key</div>
+      </div>
+      <div class="field" id="aiBaseUrlField">
+        <label>API 基础地址</label>
+        <input type="text" id="aiBaseUrl" value="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">
+      </div>
+      <div class="field" id="aiModelField">
+        <label>模型名称</label>
+        <input type="text" id="aiModel" value="qwen-turbo">
+      </div>
+    </div>
+
+    <!-- 步骤 7：镜像访问方式 -->
+    <div class="step">
+      <h2><span class="num">7</span>镜像访问方式</h2>
       <div class="field">
         <label>GitHub 上的 Docker 镜像是公开还是私有？</label>
         <div class="radio-group">
@@ -352,6 +381,29 @@
       other: { host: '', port: 587, hint: '请填写您的 SMTP 服务器提供的授权码或密码。' }
     };
 
+    const aiProviderPresets = {
+      dashscope: {
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        model: 'qwen-turbo',
+        hint: '前往阿里云 DashScope 控制台创建 API Key：https://dashscope.console.aliyun.com/'
+      },
+      siliconflow: {
+        baseUrl: 'https://api.siliconflow.cn/v1/chat/completions',
+        model: 'Qwen/Qwen2.5-7B-Instruct',
+        hint: '前往 SiliconFlow 控制台获取 API Key：https://cloud.siliconflow.cn/'
+      },
+      custom: {
+        baseUrl: '',
+        model: '',
+        hint: '填写您自己的 OpenAI 兼容接口地址和模型名称。'
+      },
+      mock: {
+        baseUrl: '',
+        model: '',
+        hint: '模拟模式下 AI 会返回占位文本，仅用于测试界面。'
+      }
+    };
+
     document.querySelectorAll('input[name="accessMode"]').forEach(r => {
       r.addEventListener('change', () => {
         const useDomain = r.value === 'domain';
@@ -372,6 +424,21 @@
       document.getElementById('smtpPort').value = p.port;
       document.getElementById('smtpPassHint').textContent = p.hint;
     });
+
+    function updateAiFields() {
+      const provider = document.getElementById('aiProvider').value;
+      const p = aiProviderPresets[provider];
+      document.getElementById('aiProviderHint').textContent = p.hint;
+      document.getElementById('aiBaseUrl').value = p.baseUrl;
+      document.getElementById('aiModel').value = p.model;
+      const isMock = provider === 'mock';
+      document.getElementById('aiKeyField').style.display = isMock ? 'none' : 'block';
+      document.getElementById('aiBaseUrlField').style.display = isMock ? 'none' : 'block';
+      document.getElementById('aiModelField').style.display = isMock ? 'none' : 'block';
+    }
+
+    document.getElementById('aiProvider').addEventListener('change', updateAiFields);
+    updateAiFields();
 
     document.getElementById('adminPassword').addEventListener('input', checkPasswordStrength);
 
@@ -468,6 +535,11 @@
       const smtpUser = document.getElementById('smtpUser').value.trim();
       const smtpPass = document.getElementById('smtpPass').value;
       const smtpFrom = document.getElementById('smtpFrom').value.trim() || smtpUser;
+      const aiProvider = document.getElementById('aiProvider').value;
+      const aiApiKey = document.getElementById('aiApiKey').value.trim();
+      const aiBaseUrl = document.getElementById('aiBaseUrl').value.trim();
+      const aiModel = document.getElementById('aiModel').value.trim();
+      const aiMock = aiProvider === 'mock';
       const imagePrivate = document.querySelector('input[name="imageMode"]:checked').value === 'private';
       const ghUsername = document.getElementById('ghUsername').value.trim();
       const ghToken = document.getElementById('ghToken').value.trim();
@@ -493,6 +565,8 @@
       if (!smtpUserOk) { setInvalid('smtpUser', true); valid = false; } else setInvalid('smtpUser', false);
       if (!smtpPass) { setInvalid('smtpPass', true); valid = false; } else setInvalid('smtpPass', false);
 
+      if (!aiMock && !aiApiKey) { setInvalid('aiApiKey', true); valid = false; } else setInvalid('aiApiKey', false);
+
       if (imagePrivate) {
         if (!ghUsername) {
           alert('已选择私有镜像，请填写客户的 GitHub 用户名');
@@ -515,8 +589,27 @@
       generatedEnv = `# 棣友档案站 - 极空间部署环境变量
 # 生成时间：${new Date().toLocaleString()}
 
-SITE_ADDRESS=${envValue(siteAddress)}
-HTTP_PORT=${httpPort}
+SITE_ADDRESS=${envValue(siteAddress)}`;
+
+      // AI 配置（仅在非模拟模式下写入真实值）
+      const aiEnvBlock = aiMock
+        ? `# AI 配置（当前为模拟模式）
+AI_MOCK=true
+QWEN_API_KEY=${envValue('')}
+QWEN_BASE_URL=${envValue(aiBaseUrl || aiProviderPresets.dashscope.baseUrl)}
+QWEN_MODEL=${envValue(aiModel || aiProviderPresets.dashscope.model)}
+`
+        : `# AI 配置
+QWEN_API_KEY=${envValue(aiApiKey)}
+QWEN_BASE_URL=${envValue(aiBaseUrl || aiProviderPresets[aiProvider].baseUrl)}
+QWEN_MODEL=${envValue(aiModel || aiProviderPresets[aiProvider].model)}
+`;
+
+      generatedEnv += `
+${aiEnvBlock}
+`;
+
+      generatedEnv += `HTTP_PORT=${httpPort}
 HTTPS_PORT=${httpsPort}
 
 JWT_SECRET=${envValue(jwtSecret)}
@@ -563,6 +656,9 @@ SMTP_FROM=${envValue(smtpFrom)}
       - SMTP_USER=${composeValue(smtpUser)}
       - SMTP_PASS=${composeValue(smtpPass)}
       - SMTP_FROM=${composeValue(smtpFrom)}
+      ${aiMock ? '- AI_MOCK=true' : `- QWEN_API_KEY=${composeValue(aiApiKey)}`}
+      - QWEN_BASE_URL=${composeValue(aiBaseUrl || aiProviderPresets[aiProvider].baseUrl)}
+      - QWEN_MODEL=${composeValue(aiModel || aiProviderPresets[aiProvider].model)}
     volumes:
       - ${volumePath}/db:/data/db
       - ${volumePath}/storage:/data/storage
