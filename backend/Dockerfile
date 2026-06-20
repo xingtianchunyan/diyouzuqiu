@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:24-alpine AS builder
+FROM node:24.17.0-alpine AS builder
 WORKDIR /app
 
 # Install workspace root + backend dependencies
@@ -13,7 +13,7 @@ RUN npm run -w backend db:generate
 RUN npm run -w backend build
 
 # Production image
-FROM node:24-alpine
+FROM node:24.17.0-alpine
 WORKDIR /app
 
 # Copy runtime files

@@ -12,19 +12,48 @@
 ```
 
 ## 认证与权限
+
+> 认证方式同时支持两种：
+> 1. `Authorization: Bearer <token>` 请求头；
+> 2. 后端在登录/刷新成功后写入的 `HttpOnly` Cookie（名称为 `token`）。
+
+### GET /auth/captcha
+- 200: `{ "id": string, "question": string }`
+
 ### POST /auth/login
-- body: `{ "email": string, "password": string }`
-- 200: `{ "accessToken": string, "user": { "id": string, "role": "ADMIN"|"MEMBER", "memberId": string|null } }`
+- body: `{ "email": string, "password": string, "captchaId"?: string, "captchaAnswer"?: string }`
+- 说明：同一 IP 连续失败 3 次后，必须携带正确的验证码。
+- 200: `{ "token": string, "user": { "id": string, "email": string, "phone": string|null, "role": "ADMIN"|"MEMBER", "memberId": string|null } }`
+- Cookie: 同时写入 `token`（HttpOnly, Secure, SameSite=Strict）。
 
 ### POST /auth/refresh
-- body: `{ "refreshToken": string }`
-- 200: `{ "accessToken": string }`
+- 请求头：`Authorization: Bearer <token>`（或携带 `token` Cookie）。
+- 200: `{ "token": string }`
+- Cookie: 刷新 `token` Cookie。
 
 ### POST /auth/logout
-- 204
+- 认证：需要登录状态。
+- 200: `{ "message": "Logged out successfully" }`
+
+### POST /auth/change-password
+- 认证：需要登录状态。
+- body: `{ "currentPassword": string, "newPassword": string }`
+- 说明：`newPassword` 必须满足密码策略（≥8 位，包含大小写字母和数字，不在常见弱口令列表）。
+- 200: `{ "message": "Password changed successfully" }`
+
+### POST /auth/otp/send
+- body: `{ "email": string }`
+- 说明：同一邮箱 10 分钟内最多发送 3 次。未配置 SMTP 时（开发/测试环境）会在响应中返回验证码；生产环境配置 SMTP 后仅通过邮件发送。
+- 200: `{ "codeId": string, "code": string, "expiresIn": number }`（未配置 SMTP）或 `{ "codeId": string, "expiresIn": number }`（已配置 SMTP）
+
+### POST /auth/otp/login
+- body: `{ "email": string, "codeId": string, "code": string }`
+- 说明：邮箱不存在时会自动注册为 `MEMBER` 角色（可通过环境变量控制）。
+- 200: 与 `/auth/login` 成功响应相同。
 
 ### GET /me
-- 200: `{ "id": string, "email": string, "role": "ADMIN"|"MEMBER", "memberId": string|null }`
+- 认证：需要登录状态。
+- 200: `{ "id": string, "email": string, "phone": string|null, "role": "ADMIN"|"MEMBER", "memberId": string|null }`
 
 ## 成员/家庭
 ### GET /families

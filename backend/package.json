@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "start:prod": "npm run db:migrate && npm run db:seed && npm run start",
+    "start:prod": "npm run db:migrate && npm run start",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ai": "tsx src/lib/ai/json.test.ts"

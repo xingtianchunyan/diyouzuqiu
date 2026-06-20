@@ -419,6 +419,35 @@
       return /^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}(\.[a-zA-Z0-9][a-zA-Z0-9-]{0,62})+$/.test(d);
     }
 
+    // Quote a value for .env files. Wraps in double quotes and escapes
+    // backslashes, double quotes and newlines when necessary.
+    function envValue(value) {
+      if (value === '') return '""';
+      const needsQuote = /[\s$#"'\\]/.test(value);
+      if (!needsQuote) return value;
+      const escaped = value
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+      return `"${escaped}"`;
+    }
+
+    // Quote a value for docker-compose.yaml environment variables.
+    // Also escapes $ as $$ so Docker Compose does not treat it as variable
+    // interpolation.
+    function composeValue(value) {
+      if (value === '') return '""';
+      const needsQuote = /[\s$#"'\\:=\[\]{}|>&!%@,]/.test(value);
+      const escaped = value
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$/g, '$$$$')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+      return needsQuote ? `"${escaped}"` : escaped;
+    }
+
     let generatedEnv = '';
     let generatedCompose = '';
     let generatedSteps = '';
@@ -486,14 +515,14 @@
       generatedEnv = `# 棣友档案站 - 极空间部署环境变量
 # 生成时间：${new Date().toLocaleString()}
 
-SITE_ADDRESS=${siteAddress}
+SITE_ADDRESS=${envValue(siteAddress)}
 HTTP_PORT=${httpPort}
 HTTPS_PORT=${httpsPort}
 
-JWT_SECRET=${jwtSecret}
+JWT_SECRET=${envValue(jwtSecret)}
 
-ADMIN_EMAIL=${adminEmail}
-ADMIN_PASSWORD=${adminPassword}
+ADMIN_EMAIL=${envValue(adminEmail)}
+ADMIN_PASSWORD=${envValue(adminPassword)}
 
 # Docker 容器内必须保持 0.0.0.0
 HOST=0.0.0.0
@@ -502,14 +531,14 @@ DATABASE_URL=file:/data/db/diyou.db
 STORAGE_ROOT=/data/storage
 
 # 跨域来源，必须与您访问网站时地址栏里的地址一致
-CORS_ORIGIN=${corsOrigin}
+CORS_ORIGIN=${envValue(corsOrigin)}
 
 # 邮箱验证码 SMTP 配置
-SMTP_HOST=${smtpHost}
+SMTP_HOST=${envValue(smtpHost)}
 SMTP_PORT=${smtpPort}
-SMTP_USER=${smtpUser}
-SMTP_PASS=${smtpPass}
-SMTP_FROM=${smtpFrom}
+SMTP_USER=${envValue(smtpUser)}
+SMTP_PASS=${envValue(smtpPass)}
+SMTP_FROM=${envValue(smtpFrom)}
 `;
 
       const volumePath = nasPath.replace(/\/$/, '');
@@ -525,15 +554,15 @@ SMTP_FROM=${smtpFrom}
       - TRUST_PROXY=true
       - DATABASE_URL=file:/data/db/diyou.db
       - STORAGE_ROOT=/data/storage
-      - JWT_SECRET=${jwtSecret}
-      - ADMIN_EMAIL=${adminEmail}
-      - ADMIN_PASSWORD=${adminPassword}
-      - CORS_ORIGIN=${corsOrigin}
-      - SMTP_HOST=${smtpHost}
+      - JWT_SECRET=${composeValue(jwtSecret)}
+      - ADMIN_EMAIL=${composeValue(adminEmail)}
+      - ADMIN_PASSWORD=${composeValue(adminPassword)}
+      - CORS_ORIGIN=${composeValue(corsOrigin)}
+      - SMTP_HOST=${composeValue(smtpHost)}
       - SMTP_PORT=${smtpPort}
-      - SMTP_USER=${smtpUser}
-      - SMTP_PASS=${smtpPass}
-      - SMTP_FROM=${smtpFrom}
+      - SMTP_USER=${composeValue(smtpUser)}
+      - SMTP_PASS=${composeValue(smtpPass)}
+      - SMTP_FROM=${composeValue(smtpFrom)}
     volumes:
       - ${volumePath}/db:/data/db
       - ${volumePath}/storage:/data/storage
@@ -551,7 +580,7 @@ SMTP_FROM=${smtpFrom}
     container_name: diyou-web
     restart: unless-stopped
     environment:
-      - SITE_ADDRESS=${siteAddress}
+      - SITE_ADDRESS=${composeValue(siteAddress)}
       - BACKEND_URL=diyou-backend:3000
     ports:
       - "${httpPort}:80"
