@@ -290,6 +290,30 @@
       <div class="warning" id="smtpWarning" style="display:none"></div>
     </div>
 
+    <!-- 步骤 6：镜像访问方式 -->
+    <div class="step">
+      <h2><span class="num">6</span>镜像访问方式</h2>
+      <div class="field">
+        <label>GitHub 上的 Docker 镜像是公开还是私有？</label>
+        <div class="radio-group">
+          <label><input type="radio" name="imageMode" value="public" checked> 公开镜像（任何人都能拉取，最简单）</label>
+          <label><input type="radio" name="imageMode" value="private"> 私有镜像（更安全，需要提前给本账号授权）</label>
+        </div>
+        <div class="hint">如果您把镜像设成了 Private，需要先在 GitHub 上把客户的 GitHub 账号加入镜像的“读取”权限。</div>
+      </div>
+      <div id="privateImageFields" style="display:none">
+        <div class="field">
+          <label>客户的 GitHub 用户名</label>
+          <input type="text" id="ghUsername" placeholder="例如：zhangsan">
+        </div>
+        <div class="field">
+          <label>Personal Access Token（只读镜像权限）</label>
+          <div class="hint">在客户 GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) 中生成，只勾选 <code>read:packages</code>。</div>
+          <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx">
+        </div>
+      </div>
+    </div>
+
     <!-- 生成按钮 -->
     <div class="actions">
       <button class="primary-btn" id="generateBtn" onclick="generatePackage()">📦 生成部署文件包</button>
@@ -333,6 +357,12 @@
         const useDomain = r.value === 'domain';
         document.getElementById('domainField').style.display = useDomain ? 'block' : 'none';
         document.getElementById('ipField').style.display = useDomain ? 'none' : 'block';
+      });
+    });
+
+    document.querySelectorAll('input[name="imageMode"]').forEach(r => {
+      r.addEventListener('change', () => {
+        document.getElementById('privateImageFields').style.display = r.value === 'private' ? 'block' : 'none';
       });
     });
 
@@ -392,6 +422,7 @@
     let generatedEnv = '';
     let generatedCompose = '';
     let generatedSteps = '';
+    let generatedLoginScript = '';
 
     function generatePackage() {
       const useDomain = document.querySelector('input[name="accessMode"]:checked').value === 'domain';
@@ -408,6 +439,9 @@
       const smtpUser = document.getElementById('smtpUser').value.trim();
       const smtpPass = document.getElementById('smtpPass').value;
       const smtpFrom = document.getElementById('smtpFrom').value.trim() || smtpUser;
+      const imagePrivate = document.querySelector('input[name="imageMode"]:checked').value === 'private';
+      const ghUsername = document.getElementById('ghUsername').value.trim();
+      const ghToken = document.getElementById('ghToken').value.trim();
 
       let valid = true;
 
@@ -429,6 +463,17 @@
       const smtpUserOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpUser);
       if (!smtpUserOk) { setInvalid('smtpUser', true); valid = false; } else setInvalid('smtpUser', false);
       if (!smtpPass) { setInvalid('smtpPass', true); valid = false; } else setInvalid('smtpPass', false);
+
+      if (imagePrivate) {
+        if (!ghUsername) {
+          alert('已选择私有镜像，请填写客户的 GitHub 用户名');
+          valid = false;
+        }
+        if (!ghToken) {
+          alert('已选择私有镜像，请填写 Personal Access Token');
+          valid = false;
+        }
+      }
 
       if (!valid) {
         document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
@@ -526,10 +571,24 @@ networks:
 `;
 
       const accessUrl = useDomain ? `https://${domain}${httpsPort === '443' ? '' : ':' + httpsPort}` : `https://${nasIp}${httpsPort === '443' ? '' : ':' + httpsPort}`;
+
+      generatedLoginScript = imagePrivate
+        ? `# 私有镜像登录脚本（在极空间 SSH 中执行一次即可）
+# 1. 用电脑打开 PowerShell/Terminal，连接极空间：
+#    ssh 你的极空间用户名@${nasIp}
+#
+# 2. 登录 GitHub Container Registry（输入 Personal Access Token 作为密码）：
+docker login ghcr.io -u ${ghUsername}
+#
+# 3. 看到 "Login Succeeded" 后即可退出 SSH，回到极空间 Docker 应用部署 Compose 项目。
+`
+        : '';
+
       generatedSteps = `
-<li>把下载的 <code>diyou-zspace-deploy.zip</code> 解压到电脑上，得到 <code>.env</code> 和 <code>docker-compose.yaml</code>。</li>
+<li>把下载的 <code>diyou-zspace-deploy.zip</code> 解压到电脑上。</li>
+${imagePrivate ? `<li><b>私有镜像需要先登录 Docker：</b>按解压出来的 <code>docker-login-极空间.txt</code> 里的步骤，在极空间 SSH 中执行 <code>docker login ghcr.io</code>。</li>` : ''}
 <li>在极空间文件管理中新建文件夹：<code>${volumePath}</code>，并在里面再建 <code>db</code>、<code>storage</code>、<code>caddy-data</code>、<code>caddy-config</code> 四个子文件夹。</li>
-<li>把解压出来的两个文件复制到这个文件夹里。</li>
+<li>把解压出来的 <code>.env</code> 和 <code>docker-compose.yaml</code> 复制到这个文件夹里。</li>
 <li>打开极空间 Docker 应用，点击“Compose”→“新建项目”。</li>
 <li>项目名称填 <code>diyou</code>，添加方式选择“从本地导入（NAS）”，然后选中刚才的 <code>${volumePath}</code> 文件夹。</li>
 <li>确认代码框里已经正确读取了 <code>docker-compose.yaml</code> 内容，点击“创建”。</li>
@@ -555,6 +614,9 @@ networks:
       zip.file('.env', generatedEnv);
       zip.file('docker-compose.yaml', generatedCompose);
       zip.file('部署步骤.txt', document.getElementById('deploySteps').innerText);
+      if (generatedLoginScript) {
+        zip.file('docker-login-极空间.txt', generatedLoginScript);
+      }
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

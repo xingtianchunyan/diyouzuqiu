@@ -2,6 +2,24 @@
 
 本指南面向希望把项目部署到家庭 NAS（已安装 Docker 和 Docker Compose）的用户。
 
+## 镜像安全说明
+
+GitHub 仓库公开不等于运行实例暴露，但会让源码和构建好的镜像可被下载分析。推荐做法：
+
+- 仓库保持公开（便于维护）或按需设为私有。
+- 将 `ghcr.io` 上的 `diyou-backend` 和 `diyou-web` 镜像设为 **Private**。
+- 在 Package settings → Manage access 中给客户的 GitHub 账号授予 **Read** 权限。
+- 客户生成只含 `read:packages` 权限的 Personal Access Token，在极空间 SSH 中执行：
+
+```bash
+docker login ghcr.io -u 客户GitHub用户名
+# 粘贴 Token 作为密码
+```
+
+之后 Compose 即可拉取私有镜像。使用 `deploy/diyou-deploy-wizard.html` 选择“私有镜像”时会自动生成上述登录说明。
+
+---
+
 ## 0. 给非技术用户：使用填表生成器
 
 如果你不想手动编辑配置文件，直接双击运行：
