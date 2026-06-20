@@ -22,7 +22,8 @@ COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/dist ./dist
 
-# Ensure data directories exist and are writable by non-root user
+# Explicitly run as root for permission changes, then drop privileges
+USER root
 RUN mkdir -p /data/db /data/storage && chown -R node:node /data /app
 
 # Run as non-root user
