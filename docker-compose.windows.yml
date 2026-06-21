@@ -1,0 +1,79 @@
+# Windows Docker Desktop 一键部署模板
+# 使用 GitHub Container Registry 预构建镜像，避免在 Windows 上本地编译 Node.js。
+#
+# 用法：
+#   1. 复制 .env.example 为 .env 并填写必填项。
+#   2. 在 PowerShell 中进入项目目录，执行：
+#      docker compose -f docker-compose.windows.yml up -d
+#   3. 浏览器访问 http://localhost:8080（HTTP_PORT 默认 8080，可在 .env 中修改）
+#
+# 注意：
+#   - Windows 上 80/443 端口常被系统/其他服务占用，本文件默认通过 .env 使用 8080/8443。
+#   - 数据使用 Docker 命名卷持久化，删除容器不会丢失数据。
+
+services:
+  diyou-backend:
+    image: ghcr.io/xingtianchunyan/diyou-backend:latest
+    container_name: diyou-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - TRUST_PROXY=true
+      - DATABASE_URL=file:/data/db/diyou.db
+      - STORAGE_ROOT=/data/storage
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@diyou.test}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - OTP_AUTO_REGISTER=${OTP_AUTO_REGISTER:-true}
+      - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN is required}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    volumes:
+      - diyou-db:/data/db
+      - diyou-storage:/data/storage
+    networks:
+      - diyou-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  diyou-web:
+    image: ghcr.io/xingtianchunyan/diyou-web:latest
+    container_name: diyou-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:-localhost}
+      - BACKEND_URL=diyou-backend:3000
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - diyou-net
+    depends_on:
+      diyou-backend:
+        condition: service_healthy
+
+volumes:
+  diyou-db:
+  diyou-storage:
+  caddy-data:
+  caddy-config:
+
+networks:
+  diyou-net:
+    driver: bridge
