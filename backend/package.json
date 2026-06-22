@@ -36,7 +36,7 @@
     "mammoth": "^1.12.0",
     "nodemailer": "^9.0.1",
     "pdf-parse-new": "^2.0.0",
-    "read-excel-file": "^5.8.7",
+    "read-excel-file": "^9.2.0",
     "sharp": "^0.34.1",
     "zod": "^4.4.3"
   },
