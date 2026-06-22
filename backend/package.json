@@ -48,7 +48,7 @@
     "@types/cheerio": "^0.22.35",
     "@types/jsdom": "^28.0.1",
     "@types/mozilla-readability": "^0.2.1",
-    "@types/node": "^24.12.2",
+    "@types/node": "^26.0.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.5",
     "@vitest/coverage-v8": "^4.1.9",
