@@ -37,7 +37,7 @@
     "nodemailer": "^9.0.1",
     "pdf-parse-new": "^2.0.0",
     "read-excel-file": "^5.8.7",
-    "sharp": "^0.34.1",
+    "sharp": "^0.35.2",
     "zod": "^4.4.3"
   },
   "prisma": {
