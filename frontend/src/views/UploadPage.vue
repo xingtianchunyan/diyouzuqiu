@@ -19,6 +19,7 @@ import { useAuthStore } from '../stores/auth'
 import SmartImport from '../components/SmartImport.vue'
 import DailyMaterialsPanel from '../components/DailyMaterialsPanel.vue'
 import MarkdownEditor from '../components/editor/MarkdownEditor.vue'
+import FileUploadZone from '../components/base/FileUploadZone.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -191,20 +192,19 @@ const matchOptions = computed(() =>
   }))
 )
 
-const onFileChange = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  if (target.files && target.files.length > 0) {
-    mediaForm.value.files = Array.from(target.files)
-  } else {
-    mediaForm.value.files = []
-  }
+const mediaUploadZoneRef = ref<InstanceType<typeof FileUploadZone> | null>(null)
+const chronicleUploadZoneRef = ref<InstanceType<typeof FileUploadZone> | null>(null)
+
+const onMediaFilesSelect = (files: File[]) => {
+  mediaForm.value.files = files
 }
 
-const onChronicleFileChange = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  if (target.files && target.files.length > 0) {
-    chronicleForm.value.file = target.files[0]
-  }
+const onChronicleFileSelect = (files: File[]) => {
+  chronicleForm.value.file = files[0] || null
+}
+
+const onUploadZoneError = (message: string) => {
+  showMessage('error', message)
 }
 
 const loadingMessage = ref('')
@@ -360,8 +360,7 @@ const submitMedia = async () => {
 
     showMessage('success', t('upload.success') + ' ' + t('upload.filesCount', { n: successCount }))
     mediaForm.value = { files: [], takenAt: '', year: '', personTagIds: [] }
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
-    if (fileInput) fileInput.value = ''
+    mediaUploadZoneRef.value?.clearFiles()
   } catch (e: any) {
     showMessage('error', e.message || t('upload.error'))
   } finally {
@@ -449,8 +448,7 @@ const submitChronicle = async () => {
       memberIds: [], photoIds: [], videoIds: [], articleIds: [], poemIds: [], matchIds: [] 
     }
     showChronicleAdvanced.value = false
-    const fileInputs = document.querySelectorAll('input[type="file"]')
-    fileInputs.forEach(input => (input as HTMLInputElement).value = '')
+    chronicleUploadZoneRef.value?.clearFiles()
   } catch (e: any) {
     showMessage('error', e.message || t('upload.error'))
   } finally {
@@ -561,7 +559,12 @@ watch(currentTab, async () => {
       <form v-if="currentTab === 'MEDIA'" @submit.prevent="submitMedia" class="editorial-form">
         <div class="form-group">
           <label class="form-label">{{ t('upload.media.files') }}</label>
-          <input type="file" @change="onFileChange" class="form-file" accept="image/*,video/*" multiple required />
+          <FileUploadZone
+            ref="mediaUploadZoneRef"
+            scenario="media"
+            @select="onMediaFilesSelect"
+            @error="onUploadZoneError"
+          />
           <small class="help-text">{{ t('upload.media.help') }}</small>
         </div>
         <div class="form-group">
@@ -672,7 +675,12 @@ watch(currentTab, async () => {
         </div>
         <div class="form-group">
           <label class="form-label">{{ t('upload.chronicle.media') }}</label>
-          <input type="file" @change="onChronicleFileChange" class="form-file" accept="image/*,video/*" />
+          <FileUploadZone
+            ref="chronicleUploadZoneRef"
+            scenario="chronicleAttachment"
+            @select="onChronicleFileSelect"
+            @error="onUploadZoneError"
+          />
         </div>
 
         <DailyMaterialsPanel 

@@ -19,8 +19,6 @@ const file = ref<File | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-const ACCEPT = '.docx,.xlsx,.pdf,.txt,.md'
-
 function onSelect(files: File[]) {
   file.value = files[0] || null
   error.value = ''
@@ -65,7 +63,7 @@ function close() {
 
         <div class="modal-body">
           <FileUploadZone
-            :accept="ACCEPT"
+            scenario="knowledgeDoc"
             :label="t('knowledge.uploadLabel')"
             :hint="t('knowledge.uploadHint')"
             :disabled="loading"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getFilePickerRule, validateFile, type FilePickerScenario, type FileTypeRule } from '../../platform/file-picker-policy'
 
 const { t } = useI18n()
 
@@ -11,6 +12,8 @@ const props = defineProps<{
   label?: string
   hint?: string
   disabled?: boolean
+  /** 使用平台策略层的场景配置 */
+  scenario?: FilePickerScenario
 }>()
 
 const emit = defineEmits<{
@@ -22,34 +25,73 @@ const dragOver = ref(false)
 const inputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 
-const acceptList = computed(() => {
-  if (!props.accept) return []
-  return props.accept.split(',').map(s => s.trim()).filter(Boolean)
+const rule = computed<FileTypeRule | null>(() => {
+  if (!props.scenario) return null
+  return getFilePickerRule(props.scenario)
 })
 
-function validateFiles(files: File[]): File[] | string {
-  if (props.maxSizeBytes) {
-    const oversized = files.find(f => f.size > props.maxSizeBytes!)
+const acceptValue = computed(() => {
+  if (props.accept) return props.accept
+  return rule.value?.accept ?? '*'
+})
+
+const multipleValue = computed(() => {
+  if (props.multiple !== undefined) return props.multiple
+  return rule.value?.multiple ?? false
+})
+
+const maxSizeValue = computed(() => {
+  if (props.maxSizeBytes !== undefined) return props.maxSizeBytes
+  return rule.value?.maxSizeBytes ?? 0
+})
+
+const labelValue = computed(() => {
+  if (props.label) return props.label
+  if (rule.value?.labelKey) return t(rule.value.labelKey)
+  return t('upload.dropzoneLabel')
+})
+
+const hintValue = computed(() => {
+  if (props.hint) return props.hint
+  if (rule.value?.hintKey) return t(rule.value.hintKey)
+  return ''
+})
+
+function validateFiles(files: File[]): string | null {
+  if (maxSizeValue.value > 0) {
+    const oversized = files.find(f => f.size > maxSizeValue.value)
     if (oversized) return t('upload.fileTooLarge', { name: oversized.name })
   }
-  if (acceptList.value.length) {
-    const invalid = files.find(f => {
-      const lower = f.name.toLowerCase()
-      return !acceptList.value.some(ext => lower.endsWith(ext.replace(/^\./, '')) || lower.endsWith(ext))
-    })
-    if (invalid) return t('upload.invalidFileType', { name: invalid.name })
+
+  for (const file of files) {
+    if (rule.value) {
+      const err = validateFile(file, rule.value)
+      if (err) return t(err.key, err.params ?? { name: file.name })
+    } else if (props.accept) {
+      // 兼容旧 accept 扩展名校验
+      const acceptList = props.accept.split(',').map(s => s.trim()).filter(Boolean)
+      if (acceptList.length) {
+        const lower = file.name.toLowerCase()
+        const valid = acceptList.some(ext => {
+          const clean = ext.replace(/^\./, '')
+          return lower.endsWith(clean) || lower.endsWith(ext)
+        })
+        if (!valid) return t('upload.invalidFileType', { name: file.name })
+      }
+    }
   }
-  return files
+
+  return null
 }
 
 function handleFiles(files: File[]) {
   if (props.disabled) return
-  const result = validateFiles(files)
-  if (typeof result === 'string') {
-    emit('error', result)
+  const error = validateFiles(files)
+  if (error) {
+    emit('error', error)
     return
   }
-  selectedFiles.value = props.multiple ? [...selectedFiles.value, ...result] : result
+  selectedFiles.value = multipleValue.value ? [...selectedFiles.value, ...files] : files
   emit('select', selectedFiles.value)
 }
 
@@ -84,6 +126,8 @@ function clearFiles() {
   selectedFiles.value = []
   emit('select', [])
 }
+
+defineExpose({ clearFiles })
 </script>
 
 <template>
@@ -99,8 +143,8 @@ function clearFiles() {
       <input
         ref="inputRef"
         type="file"
-        :accept="accept"
-        :multiple="multiple"
+        :accept="acceptValue"
+        :multiple="multipleValue"
         class="hidden-input"
         @change="onFileChange"
         :disabled="disabled"
@@ -111,8 +155,8 @@ function clearFiles() {
           <polyline points="17 8 12 3 7 8"></polyline>
           <line x1="12" y1="3" x2="12" y2="15"></line>
         </svg>
-        <div class="drop-label">{{ label || t('upload.dropzoneLabel') }}</div>
-        <div v-if="hint" class="drop-hint">{{ hint }}</div>
+        <div class="drop-label">{{ labelValue }}</div>
+        <div v-if="hintValue" class="drop-hint">{{ hintValue }}</div>
       </div>
     </div>
 

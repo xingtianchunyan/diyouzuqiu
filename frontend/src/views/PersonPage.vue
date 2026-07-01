@@ -9,6 +9,7 @@ import { matchesService, type Match } from '../api/services/matches.service'
 import { chroniclesService } from '../api/services/chronicles.service'
 import { useAuthStore } from '../stores/auth'
 import { useFamiliesStore } from '../stores/families'
+import { getFilePickerRule, validateFile } from '../platform/file-picker-policy'
 import EmptyState from '../components/base/EmptyState.vue'
 import WorksGridModule from '@/components/works/WorksGridModule.vue'
 import WorksCollectionModule, { type WorksTypeFilter } from '@/components/works/WorksCollectionModule.vue'
@@ -115,10 +116,19 @@ const canEdit = computed(() => {
   return authStore.user.role === 'ADMIN' || authStore.user.memberId === id.value
 })
 
+const avatarRule = computed(() => getFilePickerRule('avatar'))
+
 const onAvatarChange = async (e: Event) => {
   const target = e.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
+
+  const validation = validateFile(file, avatarRule.value)
+  if (validation) {
+    alert(t(validation.key, validation.params ?? { name: file.name }))
+    target.value = ''
+    return
+  }
 
   try {
     const res = await membersService.uploadAvatar(id.value, file)
@@ -330,7 +340,12 @@ onUnmounted(() => {
             
             <label v-if="canEdit" class="edit-avatar-btn">
               {{ $t('person.changeAvatar') }}
-              <input type="file" @change="onAvatarChange" accept="image/*" style="display: none" />
+              <input
+                type="file"
+                @change="onAvatarChange"
+                :accept="avatarRule.accept"
+                style="display: none"
+              />
             </label>
           </div>
           <div class="profile-info">
