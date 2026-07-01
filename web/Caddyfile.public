@@ -2,11 +2,18 @@
     root * /srv
     encode gzip
 
-    # Proxy API and user-uploaded static files to the backend
-    reverse_proxy /api/* {$BACKEND_URL:diyou-backend:3000}
-    reverse_proxy /static-storage/* {$BACKEND_URL:diyou-backend:3000}
+    # Keep API/static routes out of the SPA fallback to avoid accidental
+    # rewrites of non-GET requests.
+    handle /api/* {
+        reverse_proxy {$BACKEND_URL:diyou-backend:3000}
+    }
 
-    # SPA fallback
-    try_files {path} /index.html
-    file_server
+    handle /static-storage/* {
+        reverse_proxy {$BACKEND_URL:diyou-backend:3000}
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
 }
