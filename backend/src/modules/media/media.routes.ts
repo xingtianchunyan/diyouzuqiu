@@ -335,14 +335,23 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     })
 
     if (!media || !media.storagePath) {
-      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'File not found' } })
+      return reply
+        .code(404)
+        .header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+        .send({ error: { code: 'NOT_FOUND', message: 'File not found' } })
     }
 
     if (!canAccessMedia(media, request.user)) {
-      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You do not have permission to view this file' } })
+      return reply
+        .code(403)
+        .header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+        .send({ error: { code: 'FORBIDDEN', message: 'You do not have permission to view this file' } })
     }
 
-    return reply.sendFile(media.storagePath)
+    return reply
+      .header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+      .header('Pragma', 'no-cache')
+      .sendFile(media.storagePath)
   })
 
   // DELETE /media/:id
