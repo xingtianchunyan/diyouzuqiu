@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+import { get401Policy, type EndpointKind } from '../platform/session-policy'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -28,22 +29,52 @@ apiClient.interceptors.request.use(
   }
 )
 
-// Response interceptor: on 401, clear the local session and redirect to login.
+function classifyEndpoint(url: string): EndpointKind {
+  if (url === '/auth/login') return 'login'
+  if (url === '/auth/refresh') return 'refresh'
+  if (url.startsWith('/media/')) return 'media'
+  return 'resource'
+}
+
+let isRecovering = false
+
+// Response interceptor: on 401, apply platform session recovery policy.
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response
   },
   async (error: AxiosError) => {
     const url = error.config?.url
-    if (error.response?.status === 401 && url !== '/auth/login' && url !== '/auth/refresh') {
-      const { useAuthStore } = await import('../stores/auth')
-      const authStore = useAuthStore()
+    if (error.response?.status !== 401 || !url) {
+      return Promise.reject(error)
+    }
 
-      authStore.logout()
+    const policy = get401Policy(classifyEndpoint(url))
 
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+    if (policy === 'ignore') {
+      return Promise.reject(error)
+    }
+
+    const { useAuthStore } = await import('../stores/auth')
+    const authStore = useAuthStore()
+
+    // Try a single silent recovery before forcing logout.
+    if (policy === 'recover-once' && !isRecovering && error.config) {
+      isRecovering = true
+      try {
+        const recovered = await authStore.recoverSession()
+        if (recovered) {
+          return apiClient.request(error.config)
+        }
+      } finally {
+        isRecovering = false
       }
+    }
+
+    await authStore.logout()
+
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login'
     }
 
     return Promise.reject(error)

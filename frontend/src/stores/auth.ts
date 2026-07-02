@@ -76,6 +76,38 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * 尝试恢复会话。
+   * 用于 401 响应拦截器或前后台恢复时的静默恢复。
+   * 返回 true 表示恢复成功，false 表示恢复失败。
+   */
+  const recoverSession = async (): Promise<boolean> => {
+    try {
+      await refreshToken()
+      await fetchCurrentUser()
+      startRefreshTimer()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * 页面从后台恢复时检查会话是否仍然有效。
+   * 如果本地认为已登录但会话已过期，则尝试一次恢复。
+   */
+  const resumeCheck = async (): Promise<void> => {
+    if (!isAuthenticated.value) return
+    try {
+      await fetchCurrentUser()
+    } catch {
+      const recovered = await recoverSession()
+      if (!recovered) {
+        await logout()
+      }
+    }
+  }
+
   return {
     user,
     initialized,
@@ -84,6 +116,8 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchCurrentUser,
     refreshToken,
-    initialize
+    initialize,
+    recoverSession,
+    resumeCheck
   }
 })

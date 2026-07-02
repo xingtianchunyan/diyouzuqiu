@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from './stores/app'
 import { useAuthStore } from './stores/auth'
+import { usePlatformRuntimeState, shouldWatchResume } from './platform/runtime-state'
 import SoccerFX from './components/SoccerFX.vue'
 import OrganicDropdown from './components/base/OrganicDropdown.vue'
 
@@ -20,6 +21,12 @@ onMounted(async () => {
     // Silent: auth guard will redirect if needed
   }
 })
+
+if (shouldWatchResume()) {
+  usePlatformRuntimeState(async () => {
+    await authStore.resumeCheck()
+  })
+}
 
 function toggleLocale() {
   app.toggleLocale()
