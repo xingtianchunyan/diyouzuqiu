@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from './stores/app'
 import { useAuthStore } from './stores/auth'
 import { usePlatformRuntimeState, shouldWatchResume } from './platform/runtime-state'
+import { installPlatformDebug } from './platform/debug'
 import SoccerFX from './components/SoccerFX.vue'
 import OrganicDropdown from './components/base/OrganicDropdown.vue'
 
@@ -15,6 +16,7 @@ const router = useRouter()
 const route = useRoute()
 
 onMounted(async () => {
+  installPlatformDebug()
   try {
     await authStore.initialize()
   } catch (err) {
