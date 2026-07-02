@@ -198,12 +198,79 @@ reply
 - [ ] 自动化回归测试通过。
 - [ ] 灰度期间无异常反馈。
 
+## 8.1 灰度验证机制
+
+### 开关配置来源
+
+配置优先级从低到高：
+
+1. 默认值
+2. URL 查询参数（仅开发/测试环境）
+3. `window.__PLATFORM_CONFIG__` 注入
+4. `setPlatformConfig()` 运行时覆盖
+
+### URL 参数快速验证（开发/测试）
+
+在浏览器地址栏追加参数即可临时切换策略：
+
+| 参数 | 取值 | 效果 |
+|-----|------|------|
+| `explicitMime` | `1` / `true` / `yes` | 强制所有平台使用具体 MIME 列表 |
+| `harmonyPolicy` | `0` / `false` / `no` | 关闭鸿蒙特化策略 |
+
+示例：
+```
+https://diyou.example.com/upload?explicitMime=1
+```
+
+### 运行时调试工具
+
+开发环境下，`platformDebug` 对象会自动挂载到 `window`：
+
+```js
+// 查看当前平台状态、配置、能力开关、accept 规则
+platformDebug.log()
+
+// 强制开启显式 MIME 列表
+platformDebug.enableExplicitMime()
+
+// 关闭鸿蒙特化策略
+platformDebug.disableHarmonyPolicy()
+
+// 重置运行时覆盖
+platformDebug.reset()
+```
+
+### 生产回滚
+
+若灰度期间某平台出现异常，可执行以下任一操作：
+
+1. **前端热覆盖**：通过 `window.__PLATFORM_CONFIG__` 或 `platformDebug.reset()` 关闭新策略。
+2. **重新部署**：将 `useExplicitMobileMediaAcceptList` 默认值改为 `false`。
+3. **服务端不变**：本次改造不涉及服务端白名单与存储逻辑，回滚无需改动后端。
+
+## 8.2 灰度上线步骤
+
+1. **开发环境验证**
+   - 使用 URL 参数 `?explicitMime=1` 在各平台模拟器/浏览器验证上传行为。
+   - 使用 `platformDebug.log()` 确认当前 accept 策略符合预期。
+2. **测试环境三端真机验证**
+   - 按 [mobile-compatibility-test-matrix.md](./mobile-compatibility-test-matrix.md) 执行 P0 用例。
+   - 分别测试默认策略与 `explicitMime=1` 策略。
+3. **生产小范围灰度**
+   - 先对管理员或少量用户开放新策略。
+   - 观察上传成功率、错误日志、用户反馈。
+4. **全量开放**
+   - 灰度 3-7 天无异常后，将 `useExplicitMobileMediaAcceptList` 默认值改为 `true`（如验证通过）。
+5. **回滚预案**
+   - 任一平台出现异常时，通过热覆盖或重新部署关闭新策略。
+
 ## 9. 阶段划分与优先级
 
 | 阶段 | 优先级 | 内容 | 产出 |
 |-----|-------|------|------|
 | P0 | 高 | 支持矩阵文档 + 平台能力层 + 统一上传入口 | `docs/mobile-compatibility-plan.md`、`docs/mobile-compatibility-test-matrix.md`、`frontend/src/platform/`、`FileUploadZone` 改造 |
-| P1 | 中 | 灰度开关 + 真机测试矩阵落地 | 开关配置、测试报告 |
+| P1 | 中 | 灰度开关 + 真机测试矩阵落地 | 开关配置、`platformDebug` 工具、灰度验证报告 |
 | P2 | 低 | 认证恢复保护带 + 媒体缓存头 | `auth.ts`/`client.ts` 改造、`media.routes.ts` 缓存头 |
 
 ## 10. 关键决策记录
