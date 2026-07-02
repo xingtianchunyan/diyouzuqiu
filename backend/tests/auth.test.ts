@@ -158,7 +158,7 @@ describe('Auth API', () => {
     expect(body.question).toMatch(/\d+ \+ \d+ = \?/)
   })
 
-  it('POST /api/v1/auth/login sets secure HttpOnly SameSite=Strict cookie', async () => {
+  it('POST /api/v1/auth/login sets secure HttpOnly SameSite=Lax cookie', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/login',
@@ -170,7 +170,7 @@ describe('Auth API', () => {
     const cookie = Array.isArray(setCookie) ? setCookie[0] : setCookie
     expect(cookie).toContain('token=')
     expect(cookie).toContain('HttpOnly')
-    expect(cookie).toContain('SameSite=Strict')
+    expect(cookie).toContain('SameSite=Lax')
     expect(cookie).toContain('Path=/')
   })
 

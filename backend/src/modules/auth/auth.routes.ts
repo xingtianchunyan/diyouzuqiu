@@ -53,7 +53,7 @@ function setTokenCookie(reply: any, token: string) {
   reply.setCookie(TOKEN_COOKIE_NAME, token, {
     httpOnly: true,
     secure: isProduction(),
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: '/',
     maxAge: TOKEN_MAX_AGE_MS
   })

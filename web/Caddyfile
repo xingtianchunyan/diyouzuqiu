@@ -12,13 +12,20 @@
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'"
     }
 
-    # Proxy API and user-uploaded static files to the backend
-    reverse_proxy /api/* {$BACKEND_URL:diyou-backend:3000}
-    reverse_proxy /static-storage/* {$BACKEND_URL:diyou-backend:3000}
+    # Separate API/static proxying from the SPA fallback so POST requests are
+    # never rewritten to index.html.
+    handle /api/* {
+        reverse_proxy {$BACKEND_URL:diyou-backend:3000}
+    }
 
-    # SPA fallback
-    try_files {path} /index.html
-    file_server
+    handle /static-storage/* {
+        reverse_proxy {$BACKEND_URL:diyou-backend:3000}
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
 
     # Use Caddy's internal CA for local HTTPS.
     # If you have a public domain, remove the next line to use Let's Encrypt.
