@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from './stores/app'
@@ -13,12 +13,25 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
+const handleResume = () => {
+  if (document.visibilityState === 'visible') {
+    authStore.refreshIfNeeded()
+  }
+}
+
 onMounted(async () => {
   try {
     await authStore.initialize()
   } catch (err) {
     // Silent: auth guard will redirect if needed
   }
+  document.addEventListener('visibilitychange', handleResume)
+  window.addEventListener('focus', handleResume)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleResume)
+  window.removeEventListener('focus', handleResume)
 })
 
 function toggleLocale() {
