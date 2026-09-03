@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
+import { useAppStore } from '../stores/app'
 import { useRouter } from 'vue-router'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const authStore = useAuthStore()
+const app = useAppStore()
 const router = useRouter()
 
 const handleLogout = () => {
   authStore.logout()
   router.push('/login')
+}
+
+function toggleLocale() {
+  app.toggleLocale()
+  locale.value = app.locale
 }
 
 const navItems = [
@@ -70,6 +77,9 @@ const navItems = [
       </div>
 
       <div class="user-zone">
+        <button class="btn-ghost lang-btn" type="button" @click="toggleLocale">
+          {{ app.locale === 'zh-CN' ? t('app.langToggle.en') : t('app.langToggle.zh') }}
+        </button>
         <template v-if="authStore.user">
           <span class="user-email">{{ authStore.user.email }}</span>
           <button class="btn-ghost" type="button" @click="handleLogout">

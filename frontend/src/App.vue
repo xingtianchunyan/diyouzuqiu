@@ -78,7 +78,10 @@ const handleMobileNav = (val: string) => {
 <template>
   <div class="app-layout">
     <SoccerFX />
-    <header class="app-header animate-fade-in safe-top">
+    <header
+      v-if="route.name !== 'home'"
+      class="app-header animate-fade-in safe-top"
+    >
       <div class="header-inner">
         <RouterLink to="/" class="brand">
           <span class="brand-text">DIYOU</span>
