@@ -35,7 +35,7 @@ apiClient.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const url = error.config?.url
-    if (error.response?.status === 401 && url !== '/auth/login' && url !== '/auth/refresh') {
+    if (error.response?.status === 401 && url !== '/auth/login' && url !== '/auth/refresh' && url !== '/auth/logout') {
       const { useAuthStore } = await import('../stores/auth')
       const authStore = useAuthStore()
 
