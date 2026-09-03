@@ -13,6 +13,22 @@ export interface MemberDetail extends Member {
   mediaCount?: number
   worksCount?: number
   matchesCount?: number
+  // Baseline ability ratings (0-99, default 60), admin-managed
+  pace?: number
+  shooting?: number
+  passing?: number
+  dribbling?: number
+  defending?: number
+  stamina?: number
+}
+
+export interface MemberStats {
+  memberId: string
+  appearances: number
+  wins: number
+  /** 0-1 ratio; a draw is not a win */
+  winRate: number
+  mvpCount: number
 }
 
 export const membersService = {
@@ -36,5 +52,9 @@ export const membersService = {
 
   getMemberDetail(id: string) {
     return apiClient.get<MemberDetail>(`/members/${id}`)
+  },
+
+  getMemberStats(id: string) {
+    return apiClient.get<MemberStats>(`/members/${id}/stats`)
   }
 }

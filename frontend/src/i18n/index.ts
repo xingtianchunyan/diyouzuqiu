@@ -147,7 +147,24 @@ const messages = {
       confirmDeleteMedia: '确认删除该媒体吗？此操作不可恢复。',
       confirmDeleteWork: '确认删除该作品吗？此操作不可恢复。',
       confirmDeleteMatch: '确认删除该比赛记录吗？此操作不可恢复。',
-      confirmDeleteChronicle: '确认删除该大事记吗？此操作不可恢复。'
+      confirmDeleteChronicle: '确认删除该大事记吗？此操作不可恢复。',
+      playerCard: '球员卡',
+      overall: '综合',
+      abilities: {
+        pace: '速度',
+        shooting: '射门',
+        passing: '传球',
+        dribbling: '盘带',
+        defending: '防守',
+        stamina: '体能'
+      },
+      stats: {
+        title: '生涯数据',
+        appearances: '出场',
+        wins: '胜场',
+        winRate: '胜率',
+        mvp: 'MVP'
+      }
     },
     media: {
       alt: '媒体',
@@ -732,7 +749,24 @@ const messages = {
       confirmDeleteMedia: 'Are you sure you want to delete this media? This action cannot be undone.',
       confirmDeleteWork: 'Are you sure you want to delete this work? This action cannot be undone.',
       confirmDeleteMatch: 'Are you sure you want to delete this match record? This action cannot be undone.',
-      confirmDeleteChronicle: 'Are you sure you want to delete this chronicle? This action cannot be undone.'
+      confirmDeleteChronicle: 'Are you sure you want to delete this chronicle? This action cannot be undone.',
+      playerCard: 'PLAYER CARD',
+      overall: 'OVR',
+      abilities: {
+        pace: 'PAC',
+        shooting: 'SHO',
+        passing: 'PAS',
+        dribbling: 'DRI',
+        defending: 'DEF',
+        stamina: 'STA'
+      },
+      stats: {
+        title: 'CAREER STATS',
+        appearances: 'Apps',
+        wins: 'Wins',
+        winRate: 'Win Rate',
+        mvp: 'MVP'
+      }
     },
     media: {
       alt: 'Media',
