@@ -84,6 +84,8 @@ watch(id, fetchMedia)
           class="media-main"
           controls
           autoplay
+          muted
+          playsinline
         ></video>
       </div>
 
