@@ -19,7 +19,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginPage, meta: { public: true } },
-    { path: '/', name: 'home', component: HomePage },
+    { path: '/', name: 'home', component: HomePage, meta: { public: true } },
     { path: '/history', name: 'history', component: HistoryPage },
     { path: '/history/:year(\\d{4})', name: 'year', component: YearPage, props: true },
     { path: '/media', name: 'media', component: MediaPage },

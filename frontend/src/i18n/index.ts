@@ -86,6 +86,18 @@ const messages = {
       title: '棣友足球队',
       subtitle: '内部网站（移动端优先 / 可安装为 PWA）',
       welcome: '欢迎, {name}',
+      hero: {
+        kicker: '以球会友 · 十年同行',
+        title: 'DIYOU FC',
+        subtitle: '棣友足球队 · EST. 2013'
+      },
+      sections: {
+        kicker: '球队分区',
+        title: '进入球场'
+      },
+      auth: {
+        signIn: '成员登录'
+      },
       nav: {
         historyDesc: '查看历年大事记与照片',
         mediaDesc: '浏览所有照片和视频',
@@ -652,6 +664,18 @@ const messages = {
       title: 'DiYou FC',
       subtitle: 'Internal site (mobile-first / PWA)',
       welcome: 'Welcome, {name}',
+      hero: {
+        kicker: 'Grassroots Football · Since 2013',
+        title: 'DIYOU FC',
+        subtitle: 'DiYou Football Club · EST. 2013'
+      },
+      sections: {
+        kicker: 'CLUB SECTIONS',
+        title: 'Enter the Pitch'
+      },
+      auth: {
+        signIn: 'Member Sign In'
+      },
       nav: {
         historyDesc: 'View historical events and photos',
         mediaDesc: 'Browse all photos and videos',
