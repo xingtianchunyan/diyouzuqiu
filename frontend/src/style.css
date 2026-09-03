@@ -33,6 +33,12 @@
   /* Very diffuse, wide shadow to look like a floating piece of paper rather than a UI component */
   --shadow-whisper: 0 20px 60px -15px rgba(0, 0, 0, 0.05);
 
+  /* Safe area insets (notch / home indicator), require viewport-fit=cover */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   color-scheme: light;
   background: var(--bg);
   color: var(--text);
@@ -89,6 +95,38 @@ code {
 }
 
 /* --- Premium Utility Classes --- */
+
+/* Safe area padding utilities (pair with viewport-fit=cover) */
+.safe-top {
+  padding-top: var(--safe-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--safe-bottom);
+}
+
+.safe-left {
+  padding-left: var(--safe-left);
+}
+
+.safe-right {
+  padding-right: var(--safe-right);
+}
+
+.safe-x {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+.safe-y {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* All four directions */
+.safe-area {
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
 
 .editorial-container {
   max-width: 1100px;
