@@ -2,6 +2,14 @@
     root * /srv
     encode gzip
 
+    # Redirect visitors who arrive over plain HTTP via the Cloudflare tunnel.
+    # The edge sets X-Forwarded-Proto to the visitor's real scheme; direct local
+    # access has no such header and is unaffected. Without this, phones that
+    # reach the site over HTTP get a Secure cookie at login which the browser
+    # refuses to store — the session then dies on the first navigation.
+    @insecure header X-Forwarded-Proto http
+    redir @insecure https://{host}{uri} 308
+
     # Keep API/static routes out of the SPA fallback to avoid accidental
     # rewrites of non-GET requests.
     handle /api/* {
