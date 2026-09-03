@@ -122,7 +122,8 @@ const handleDeleteMedia = async (mediaId: string) => {
 </script>
 
 <template>
-  <main class="editorial-container animate-fade-in">
+  <main class="arena-theme media-page">
+    <div class="editorial-container animate-fade-in">
     <div class="editorial-header">
       <div class="label-micro delay-1 animate-slide-up">
         {{ t('media.archive') }}
@@ -181,11 +182,14 @@ const handleDeleteMedia = async (mediaId: string) => {
       <p class="empty-text">{{ t('media.noRecords') }}</p>
       <button class="minimal-btn" @click="router.push('/upload')">{{ t('history.contribute') }}</button>
     </div>
+    </div>
   </main>
 
   <MediaLightbox
     :media="selectedMedia"
+    :list="mediaList"
     @close="selectedMedia = null"
+    @navigate="selectedMedia = $event"
   />
 
   <MediaEditModal
@@ -196,6 +200,115 @@ const handleDeleteMedia = async (mediaId: string) => {
 </template>
 
 <style scoped>
+/* ===== Page-level arena theme (scoped, never :root) ===== */
+.arena-theme {
+  --font-display: 'Anton', 'Inter', system-ui, sans-serif;
+  --arena-text: #eef3ee;
+  --arena-muted: rgba(238, 243, 238, 0.55);
+  --arena-faint: rgba(238, 243, 238, 0.32);
+  --arena-line: rgba(255, 255, 255, 0.09);
+  --arena-green: #3ddc84;
+  --arena-green-deep: #1f7a48;
+  --arena-gold: #e8c766;
+
+  /* Re-tone inherited editorial tokens so shared children
+     (OrganicDropdown, headings, empty states) read dark here */
+  --bg: #05080a;
+  --surface: #0a120d;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --text-h: var(--arena-text);
+  --text: rgba(238, 243, 238, 0.82);
+  --text-muted: var(--arena-muted);
+  --border: var(--arena-line);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  min-height: 100dvh;
+  color: var(--arena-text);
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgba(232, 199, 102, 0.07), transparent 60%),
+    radial-gradient(1000px 720px at 8% 112%, rgba(31, 122, 72, 0.2), transparent 65%),
+    linear-gradient(180deg, #05080a 0%, #08130e 52%, #05080a 100%);
+}
+
+.media-page .editorial-container {
+  padding-top: calc(4rem + var(--safe-top));
+  padding-bottom: calc(4rem + var(--safe-bottom));
+}
+
+.media-page .label-micro {
+  color: var(--arena-green);
+  letter-spacing: 0.22em;
+}
+
+.media-page .editorial-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--arena-text);
+}
+
+.media-page .editorial-subtitle {
+  color: var(--arena-muted);
+}
+
+.media-page .action-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 199, 102, 0.55);
+  color: var(--arena-gold);
+  background: rgba(232, 199, 102, 0.08);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .media-page .action-btn:hover {
+    color: #14210f;
+    background: var(--arena-gold);
+    text-decoration: none;
+  }
+}
+
+.media-page .action-btn:active {
+  transform: scale(0.96);
+}
+
+.media-page .divider-y {
+  background-color: var(--arena-line);
+}
+
+.media-page .minimal-btn {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: var(--arena-text);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (hover: hover) {
+  .media-page .minimal-btn:hover {
+    background: var(--arena-text);
+    color: #05080a;
+  }
+}
+
+.media-page .empty-text {
+  font-family: var(--sans);
+  color: var(--arena-muted);
+}
+
+.media-page .loading-state {
+  color: var(--arena-muted);
+}
+
+.media-page .spinner {
+  border-color: var(--arena-line);
+  border-top-color: var(--arena-green);
+}
+
 .filters-row {
   display: flex;
   flex-wrap: wrap;

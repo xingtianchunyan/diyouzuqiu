@@ -51,5 +51,18 @@ export const mediaService = {
   getMediaFileUrl(id: string) {
     // Return the URL for the media file, which includes the access token or uses cookies
     return `${apiClient.defaults.baseURL}/media/${id}/file`
+  },
+
+  /**
+   * Resolve an API-returned asset URL (e.g. `thumbUrl`, root-relative like
+   * `/api/v1/media/:id/thumb`) into a loadable URL, honoring a configured
+   * API origin (VITE_API_BASE_URL). Absolute URLs pass through untouched.
+   */
+  resolveAssetUrl(url: string | null | undefined) {
+    if (!url) return null
+    if (/^https?:\/\//i.test(url)) return url
+    const base = apiClient.defaults.baseURL ?? ''
+    const origin = base.replace(/\/api\/v1\/?$/, '')
+    return `${origin}${url}`
   }
 }

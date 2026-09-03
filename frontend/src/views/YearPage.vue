@@ -437,6 +437,8 @@ watch(() => route.params.year, (newYear) => {
           class="lightbox-media" 
           controls 
           autoplay
+          muted
+          playsinline
           @dblclick="selectedMedia = null"
         ></video>
         <div class="lightbox-hint">{{ t('media.lightboxHint') }}</div>

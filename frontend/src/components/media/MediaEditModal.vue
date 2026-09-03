@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { Media, MediaMeta } from '../../api/services/media.service'
 import { mediaService } from '../../api/services/media.service'
 import { useMembersStore } from '../../stores/members'
+import { useScrollLock } from '../../composables/useScrollLock'
 import OrganicDropdown from '../base/OrganicDropdown.vue'
 
 const props = defineProps<{
@@ -17,6 +18,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const membersStore = useMembersStore()
+
+// BUG-007: freeze body scroll (iOS-safe) while the modal is open
+useScrollLock(computed(() => !!props.media))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -161,6 +165,12 @@ const handleSubmit = async () => {
   font-size: 1.5rem;
   color: var(--text-muted);
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .editorial-form {

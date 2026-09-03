@@ -174,6 +174,13 @@ const messages = {
       membersLabel: '队员',
       lightboxHint: '✌️ 双指缩放，双击关闭',
       openDetailPage: '打开独立页面',
+      gallery: {
+        playVideo: '播放视频',
+        viewPhoto: '查看照片'
+      },
+      lightboxPrev: '上一张',
+      lightboxNext: '下一张',
+      lightboxCounter: '{index} / {total}',
       editTitle: '编辑媒体',
       form: {
         takenAt: '拍摄时间',
@@ -752,6 +759,13 @@ const messages = {
       membersLabel: 'Members',
       lightboxHint: '✌️ Pinch to zoom, double-tap to close',
       openDetailPage: 'Open detail page',
+      gallery: {
+        playVideo: 'Play video',
+        viewPhoto: 'View photo'
+      },
+      lightboxPrev: 'Previous',
+      lightboxNext: 'Next',
+      lightboxCounter: '{index} / {total}',
       editTitle: 'Edit Media',
       form: {
         takenAt: 'TAKEN AT',
