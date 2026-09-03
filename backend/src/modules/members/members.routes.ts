@@ -14,12 +14,24 @@ const createMemberSchema = z.object({
   familyId: z.string().optional()
 })
 
+// Baseline ability ratings must stay a strict whitelist (see security audit C-02):
+// never pass the raw request body through to prisma.
+const abilitySchema = z.number().int().min(0).max(99)
+
 const updateMemberSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   team: z.enum(['RED', 'BLUE']).optional().nullable(),
   familyId: z.string().optional().nullable(),
-  isCaptain: z.boolean().optional()
+  isCaptain: z.boolean().optional(),
+  shooting: abilitySchema.optional(),
+  passing: abilitySchema.optional(),
+  defending: abilitySchema.optional(),
+  pace: abilitySchema.optional(),
+  stamina: abilitySchema.optional(),
+  dribbling: abilitySchema.optional()
 })
+
+const ABILITY_FIELDS = ['shooting', 'passing', 'defending', 'pace', 'stamina', 'dribbling'] as const
 
 export const membersRoutes: FastifyPluginAsync = async (app) => {
   // GET /members
@@ -105,7 +117,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
   // PUT /members/:id
   app.put('/members/:id', { preValidation: [app.authenticate, validateBody(updateMemberSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { displayName, team, familyId, isCaptain } = (request as any).validatedBody
+    const { displayName, team, familyId, isCaptain, ...abilities } = (request as any).validatedBody
     const user = request.user
 
     const data: any = {}
@@ -115,6 +127,10 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       if (team !== undefined) data.team = team || null
       if (familyId !== undefined) data.familyId = familyId || null
       if (isCaptain !== undefined) data.isCaptain = isCaptain
+      // Ability baselines are admin-managed to keep ratings credible
+      for (const field of ABILITY_FIELDS) {
+        if (abilities[field] !== undefined) data[field] = abilities[field]
+      }
     } else {
       if (user.memberId !== id) {
         return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You can only edit your own profile' } })
@@ -132,6 +148,51 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
     })
 
     return member
+  })
+
+  // GET /members/:id/stats
+  app.get('/members/:id/stats', { preValidation: [app.authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+
+    try {
+      const member = await prisma.member.findUnique({
+        where: { id },
+        select: { id: true }
+      })
+      if (!member) {
+        return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Member not found' } })
+      }
+
+      const [participations, mvpCount] = await Promise.all([
+        prisma.matchParticipant.findMany({
+          where: { memberId: id },
+          select: {
+            side: true,
+            match: { select: { redScore: true, blueScore: true } }
+          }
+        }),
+        prisma.match.count({ where: { mvpMemberId: id } })
+      ])
+
+      const appearances = participations.length
+      // A draw is not a win: the member's side must have strictly more goals.
+      const wins = participations.filter((p) =>
+        p.side === 'RED'
+          ? p.match.redScore > p.match.blueScore
+          : p.match.blueScore > p.match.redScore
+      ).length
+
+      return {
+        memberId: id,
+        appearances,
+        wins,
+        winRate: appearances === 0 ? 0 : wins / appearances,
+        mvpCount
+      }
+    } catch (e: any) {
+      console.error('Error fetching member stats:', e)
+      return reply.code(500).send({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch member stats' } })
+    }
   })
 
   // POST /members/:id/avatar

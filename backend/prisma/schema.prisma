@@ -46,6 +46,13 @@ model Member {
   familyId    String?
   avatarUrl   String?
   isCaptain   Boolean  @default(false)
+  // Baseline ability ratings (0-99, FIFA-style card)
+  shooting    Int      @default(60)
+  passing     Int      @default(60)
+  defending   Int      @default(60)
+  pace        Int      @default(60)
+  stamina     Int      @default(60)
+  dribbling   Int      @default(60)
   family      Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -66,6 +73,7 @@ model MediaAsset {
   type             String
   originalFilename String
   storagePath      String
+  thumbPath        String?
   mimeType         String
   sizeBytes        Int
   takenAt          DateTime?
@@ -142,10 +150,13 @@ model Match {
 }
 
 model MatchParticipant {
-  matchId  String
-  memberId String
-  side     String
-  createdAt DateTime @default(now())
+  matchId       String
+  memberId      String
+  side          String
+  goals         Int?
+  assists       Int?
+  minutesPlayed Int?
+  createdAt     DateTime @default(now())
 
   match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
