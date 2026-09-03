@@ -455,7 +455,7 @@ onUnmounted(() => {
 
               <label v-if="canEdit" class="pc-avatar-edit">
                 {{ $t('person.changeAvatar') }}
-                <input type="file" @change="onAvatarChange" accept="image/*" style="display: none" />
+                <input type="file" @change="onAvatarChange" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none" />
               </label>
             </div>
 
@@ -1321,7 +1321,7 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100lvh;
   background: rgba(0, 0, 0, 0.95);
   z-index: 9999;
   display: flex;

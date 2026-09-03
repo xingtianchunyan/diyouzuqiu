@@ -231,7 +231,7 @@ onUnmounted(() => {
   }
   .reader {
     border-radius: 0;
-    min-height: 100vh;
+    min-height: 100svh;
   }
   .reader-body {
     padding: 1.75rem 1.25rem 2.5rem 1.25rem;
