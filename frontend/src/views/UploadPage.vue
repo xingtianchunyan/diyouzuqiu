@@ -561,7 +561,7 @@ watch(currentTab, async () => {
       <form v-if="currentTab === 'MEDIA'" @submit.prevent="submitMedia" class="editorial-form">
         <div class="form-group">
           <label class="form-label">{{ t('upload.media.files') }}</label>
-          <input type="file" @change="onFileChange" class="form-file" accept="image/*,video/*" multiple required />
+          <input type="file" @change="onFileChange" class="form-file" accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska" multiple required />
           <small class="help-text">{{ t('upload.media.help') }}</small>
         </div>
         <div class="form-group">
@@ -672,7 +672,7 @@ watch(currentTab, async () => {
         </div>
         <div class="form-group">
           <label class="form-label">{{ t('upload.chronicle.media') }}</label>
-          <input type="file" @change="onChronicleFileChange" class="form-file" accept="image/*,video/*" />
+          <input type="file" @change="onChronicleFileChange" class="form-file" accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska" />
         </div>
 
         <DailyMaterialsPanel 

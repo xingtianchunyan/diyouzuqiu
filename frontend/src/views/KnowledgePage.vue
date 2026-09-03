@@ -233,7 +233,7 @@ const chatInitialMessages = computed<ChatMessage[]>(() => {
 <style scoped>
 .knowledge-page {
   display: flex;
-  min-height: 100vh;
+  min-height: 100svh;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -245,7 +245,7 @@ const chatInitialMessages = computed<ChatMessage[]>(() => {
   flex-shrink: 0;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100svh;
 }
 
 .sidebar-header {
@@ -427,7 +427,7 @@ const chatInitialMessages = computed<ChatMessage[]>(() => {
   max-width: 700px;
   background: var(--surface);
   border-left: 1px solid var(--border-strong);
-  height: 100vh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);

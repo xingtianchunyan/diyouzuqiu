@@ -177,7 +177,7 @@ const submitPlannerForm = async () => {
 .editorial-container {
   max-width: 1000px;
   margin: 0 auto;
-  height: calc(100vh - 100px);
+  height: calc(100svh - 100px);
   display: flex;
   flex-direction: column;
 }
