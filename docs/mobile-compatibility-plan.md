@@ -1,5 +1,7 @@
 # 移动端多系统适配计划
 
+> **状态（2026-09-04）：已关闭（BUG-013）**。本计划的 P0/P1 事项已按第 1–3 批分批落地（缩略图管线、缓存头、安全区基建、滚动锁、svh/lvh、触屏操作可见性、playsinline、accept 白名单对齐、apple-touch-icon，详见 CHANGELOG.md）；统一平台能力层 `frontend/src/platform/` 按当前项目规模判定为过度设计，不再建设。剩余移动端事项以 GitHub Issues 为准。本文档保留作历史参考，其中的验收口径仍可复用。
+
 > 范围：现有 `Vue 3 + Vite PWA` 架构，不引入原生 App / Capacitor / Cordova / 鸿蒙原生模块。
 > 目标：让 `iPhone`、`Android`、`HarmonyOS` 三端在浏览器态与 PWA 安装态下均可生产可用。
 
