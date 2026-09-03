@@ -4,8 +4,19 @@ import { validateBody, validateParams, z } from '../../lib/validate.js'
 
 const participantSchema = z.object({
   memberId: z.string().min(1),
-  side: z.enum(['RED', 'BLUE'])
+  side: z.enum(['RED', 'BLUE']),
+  goals: z.number().int().min(0).optional(),
+  assists: z.number().int().min(0).optional(),
+  minutesPlayed: z.number().int().min(0).optional()
 })
+
+type ParticipantInput = {
+  memberId: string
+  side: 'RED' | 'BLUE'
+  goals?: number
+  assists?: number
+  minutesPlayed?: number
+}
 
 const createMatchSchema = z.object({
   playedAt: z.string().datetime(),
@@ -75,7 +86,7 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
       redScore: number
       blueScore: number
       mvpMemberId?: string
-      participantIds?: { memberId: string; side: 'RED' | 'BLUE' }[]
+      participantIds?: ParticipantInput[]
     }
 
     try {
@@ -89,7 +100,10 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
           participants: {
             create: participantIds?.map(p => ({
               memberId: p.memberId,
-              side: p.side
+              side: p.side,
+              goals: p.goals,
+              assists: p.assists,
+              minutesPlayed: p.minutesPlayed
             })) || []
           }
         },
@@ -162,7 +176,7 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
       blueScore?: number
       mvpMemberId?: string | null
       notes?: string
-      participantIds?: { memberId: string; side: 'RED' | 'BLUE' }[]
+      participantIds?: ParticipantInput[]
     }
 
     const data: any = {}
@@ -179,7 +193,10 @@ export const matchesRoutes: FastifyPluginAsync = async (app) => {
         data.participants = {
           create: participantIds.map(p => ({
             memberId: p.memberId,
-            side: p.side
+            side: p.side,
+            goals: p.goals,
+            assists: p.assists,
+            minutesPlayed: p.minutesPlayed
           }))
         }
       }

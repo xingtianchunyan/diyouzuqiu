@@ -122,3 +122,41 @@ export function getAbsoluteStoragePath(relativePath: string): string {
   }
   return absolute
 }
+
+const THUMB_WIDTH = 480
+const THUMB_QUALITY = 75
+
+/**
+ * Generates a webp thumbnail (max width 480px, aspect ratio preserved) for a
+ * photo media asset and stores it under media/thumbs/{yyyy}/{mm}/.
+ * Returns the storage-relative thumb path, or null if generation failed.
+ * Never throws: thumbnail failure must not block uploads or backfills.
+ */
+export async function generateMediaThumbnail(
+  source: Buffer | string,
+  id: string,
+  year: number,
+  month: number
+): Promise<string | null> {
+  try {
+    const thumbBuffer = await sharp(source)
+      .rotate() // honor EXIF orientation
+      .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+      .webp({ quality: THUMB_QUALITY })
+      .toBuffer()
+
+    const yyyy = year.toString()
+    const mm = month.toString().padStart(2, '0')
+    const relativeDir = path.join('media', 'thumbs', yyyy, mm)
+    const finalDir = path.join(STORAGE_ROOT, relativeDir)
+    await ensureDir(finalDir)
+
+    const relativeThumbPath = path.join(relativeDir, `${id}.thumb.webp`)
+    await fs.promises.writeFile(path.join(STORAGE_ROOT, relativeThumbPath), thumbBuffer)
+
+    return relativeThumbPath.replace(/\\/g, '/')
+  } catch (err) {
+    console.error('Failed to generate thumbnail for media', id, err)
+    return null
+  }
+}

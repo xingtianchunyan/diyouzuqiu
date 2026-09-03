@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '../../lib/prisma.js'
-import { saveMediaFile, getAbsoluteStoragePath } from '../../lib/storage.js'
+import { saveMediaFile, getAbsoluteStoragePath, generateMediaThumbnail } from '../../lib/storage.js'
 import { validateBufferMimeType } from '../../lib/file-type.js'
 import { validateBody, z } from '../../lib/validate.js'
 import fs from 'fs'
@@ -35,6 +35,12 @@ const updateMediaSchema = z.object({
 
 const PHOTO_MAX_SIZE = 20 * 1024 * 1024
 const VIDEO_MAX_SIZE = 100 * 1024 * 1024
+
+// Public URL of the generated thumbnail, or null when none exists
+// (videos, non-image sources, or a failed generation).
+function thumbUrlFor(media: { id: string; thumbPath?: string | null }): string | null {
+  return media.thumbPath ? `/api/v1/media/${media.id}/thumb` : null
+}
 
 function canAccessMedia(
   media: { createdByUserId: string | null; personTags: { memberId: string }[] },
@@ -140,12 +146,20 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       // Save file
       const { storagePath, sizeBytes } = await saveMediaFile(buffer, data.filename, media.id, year, month)
 
+      // Generate a webp thumbnail for photos; failure must not block the upload
+      // (thumbPath stays null and can be repaired by scripts/backfill-thumbnails.ts).
+      let thumbPath: string | null = null
+      if (type === 'PHOTO') {
+        thumbPath = await generateMediaThumbnail(buffer, media.id, year, month)
+      }
+
       // Update DB record
       await prisma.mediaAsset.update({
         where: { id: media.id },
         data: {
           storagePath,
           sizeBytes,
+          thumbPath,
           personTags: {
             create: personTagIds.map(memberId => ({
               member: { connect: { id: memberId } }
@@ -222,7 +236,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       takenAt: a.takenAt?.toISOString() || null,
       year: a.year,
       createdByUserId: a.createdByUserId,
-      thumbUrl: null, // Thumbnails feature for later
+      thumbUrl: thumbUrlFor(a),
       personTags: a.personTags.map((pt: any) => ({
         id: pt.memberId,
         displayName: pt.member.displayName
@@ -254,7 +268,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       type: media.type,
       takenAt: media.takenAt?.toISOString() || null,
       year: media.year,
-      thumbUrl: null,
+      thumbUrl: thumbUrlFor(media),
       personTags: media.personTags.map((pt: any) => ({
         id: pt.member.id,
         displayName: pt.member.displayName
@@ -319,7 +333,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       type: updated.type,
       takenAt: updated.takenAt?.toISOString() || null,
       year: updated.year,
-      thumbUrl: null,
+      thumbUrl: thumbUrlFor(updated),
       personTags: updated.personTags.map((pt: any) => ({
         id: pt.member.id,
         displayName: pt.member.displayName
@@ -327,7 +341,14 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.get('/media/:id/file', { preValidation: [app.authenticate] }, async (request, reply) => {
+  app.get('/media/:id/file', {
+    preValidation: [app.authenticate],
+    // iOS Safari caches 401 responses aggressively; never cache auth-gated files
+    // (#38). Set in onSend because sendFile (fastify-static) rewrites Cache-Control.
+    onSend: async (_request, reply) => {
+      reply.header('Cache-Control', 'no-store')
+    }
+  }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const media = await prisma.mediaAsset.findUnique({
       where: { id },
@@ -343,6 +364,35 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return reply.sendFile(media.storagePath)
+  })
+
+  app.get('/media/:id/thumb', {
+    preValidation: [app.authenticate],
+    // Same rationale as /media/:id/file: never cache auth-gated files (#38)
+    onSend: async (_request, reply) => {
+      reply.header('Cache-Control', 'no-store')
+    }
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const media = await prisma.mediaAsset.findUnique({
+      where: { id },
+      include: { personTags: true }
+    })
+
+    if (!media || !media.thumbPath) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Thumbnail not found' } })
+    }
+
+    if (!canAccessMedia(media, request.user)) {
+      return reply.code(403).send({ error: { code: 'FORBIDDEN', message: 'You do not have permission to view this file' } })
+    }
+
+    const absThumbPath = getAbsoluteStoragePath(media.thumbPath)
+    if (!fs.existsSync(absThumbPath)) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Thumbnail not found' } })
+    }
+
+    return reply.sendFile(media.thumbPath)
   })
 
   // DELETE /media/:id
@@ -376,6 +426,14 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     const absPath = getAbsoluteStoragePath(media.storagePath)
     if (fs.existsSync(absPath)) {
       fs.unlinkSync(absPath)
+    }
+
+    // Delete thumbnail if one was generated
+    if (media.thumbPath) {
+      const absThumbPath = getAbsoluteStoragePath(media.thumbPath)
+      if (fs.existsSync(absThumbPath)) {
+        fs.unlinkSync(absThumbPath)
+      }
     }
 
     await prisma.mediaAsset.delete({ where: { id } })
