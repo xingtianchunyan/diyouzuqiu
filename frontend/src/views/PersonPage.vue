@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { membersService, type MemberDetail } from '../api/services/members.service'
+import { membersService, type MemberDetail, type MemberStats } from '../api/services/members.service'
 import { mediaService, type Media } from '../api/services/media.service'
 import { worksService, type Work } from '../api/services/works.service'
 import { matchesService, type Match } from '../api/services/matches.service'
@@ -35,6 +35,7 @@ const familiesStore = useFamiliesStore()
 
 const id = computed(() => String(route.params.id ?? ''))
 const person = ref<MemberDetail | null>(null)
+const stats = ref<MemberStats | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -101,12 +102,16 @@ const handleUpdatedChronicle = (updated: any) => {
   }
 }
 
+// Admin edits may include baseline abilities: copy them too so the radar refreshes in place.
 const handleUpdatedMember = (updated: MemberDetail) => {
   if (person.value) {
     person.value.displayName = updated.displayName
     person.value.team = updated.team
     person.value.familyId = updated.familyId
     person.value.isCaptain = updated.isCaptain
+    for (const key of ABILITY_KEYS) {
+      if (updated[key] !== undefined) person.value[key] = updated[key]
+    }
   }
 }
 
@@ -134,7 +139,7 @@ const canDeleteMedia = (item: Media) => {
   if (!authStore.user) return false
   if (authStore.user.role === 'ADMIN') return true
   if (item.createdByUserId === authStore.user.id) return true
-  
+
   if (!authStore.user.memberId) return false
   // Can only delete if this is the only tagged person and it's me
   return item.personTags && item.personTags.length === 1 && item.personTags[0].id === authStore.user.memberId
@@ -230,6 +235,11 @@ const loadPerson = async () => {
     const res = await membersService.getMemberDetail(id.value)
     person.value = res.data
 
+    // Career stats feed the bar under the card; a stats failure must not blank the page.
+    membersService.getMemberStats(id.value)
+      .then(r => { stats.value = r.data })
+      .catch(() => { stats.value = null })
+
     const [chroniclesRes, mediaRes, worksRes, matchesRes] = await Promise.all([
       chroniclesService.getChronicles({ memberId: id.value }),
       mediaService.getMediaList({ personId: id.value }),
@@ -246,6 +256,86 @@ const loadPerson = async () => {
     loading.value = false
   }
 }
+
+/* ============ FIFA-style player card: abilities radar ============ */
+// Field names mirror the API exactly (GET /members/:id): 0-99, default 60.
+const ABILITY_KEYS = ['pace', 'shooting', 'passing', 'dribbling', 'defending', 'stamina'] as const
+type AbilityKey = typeof ABILITY_KEYS[number]
+
+const abilityValue = (key: AbilityKey): number => {
+  const raw = person.value?.[key]
+  const v = typeof raw === 'number' && !isNaN(raw) ? raw : 60
+  return Math.min(99, Math.max(0, v))
+}
+
+const overallRating = computed(() =>
+  Math.round(ABILITY_KEYS.reduce((sum, k) => sum + abilityValue(k), 0) / ABILITY_KEYS.length)
+)
+
+const RADAR_SIZE = 220
+const RADAR_CENTER = RADAR_SIZE / 2
+const RADAR_RADIUS = 78
+const RADAR_LABEL_RADIUS = 100
+
+const radarPointAt = (index: number, radius: number) => {
+  const angle = (-90 + index * 60) * Math.PI / 180
+  return {
+    x: RADAR_CENTER + radius * Math.cos(angle),
+    y: RADAR_CENTER + radius * Math.sin(angle)
+  }
+}
+
+const radarGridRings = [0.25, 0.5, 0.75, 1].map(f =>
+  ABILITY_KEYS.map((_, i) => radarPointAt(i, RADAR_RADIUS * f))
+    .map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ')
+)
+
+const radarAxes = ABILITY_KEYS.map((_, i) => radarPointAt(i, RADAR_RADIUS))
+
+const radarValuePoints = computed(() =>
+  ABILITY_KEYS.map((k, i) => radarPointAt(i, RADAR_RADIUS * abilityValue(k) / 99))
+    .map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ')
+)
+
+const radarValueDots = computed(() =>
+  ABILITY_KEYS.map((k, i) => radarPointAt(i, RADAR_RADIUS * abilityValue(k) / 99))
+)
+
+const radarLabels = ABILITY_KEYS.map((k, i) => ({ key: k, ...radarPointAt(i, RADAR_LABEL_RADIUS) }))
+
+const winRatePercent = computed(() => Math.round((stats.value?.winRate ?? 0) * 100))
+
+const personInitial = computed(() => (person.value?.displayName?.charAt(0) || '?').toUpperCase())
+
+/* ============ Pseudo-3D tilt (transform only, pointer-fine devices) ============ */
+const cardScene = ref<HTMLElement | null>(null)
+const tiltX = ref(0)
+const tiltY = ref(0)
+// Live mouse-follow only on hover-capable fine pointers with motion allowed;
+// touch devices get a static micro-tilt from CSS instead.
+const tiltEnabled = ref(false)
+
+const onCardPointerMove = (e: PointerEvent) => {
+  if (!tiltEnabled.value || !cardScene.value) return
+  const rect = cardScene.value.getBoundingClientRect()
+  const px = (e.clientX - rect.left) / rect.width - 0.5
+  const py = (e.clientY - rect.top) / rect.height - 0.5
+  tiltY.value = px * 10
+  tiltX.value = -py * 8
+}
+
+const resetTilt = () => {
+  tiltX.value = 0
+  tiltY.value = 0
+}
+
+const cardTransform = computed(() =>
+  tiltEnabled.value
+    ? `rotateX(${tiltX.value.toFixed(2)}deg) rotateY(${tiltY.value.toFixed(2)}deg)`
+    : undefined
+)
 
 const groupedMedia = computed(() => {
   const groups: Record<string, Media[]> = {}
@@ -289,10 +379,14 @@ onMounted(async () => {
   familiesStore.fetchFamilies()
   loadPerson()
   window.addEventListener('keydown', handleKeydown)
+  tiltEnabled.value =
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches &&
+    window.matchMedia('(prefers-reduced-motion: no-preference)').matches
 })
 
 watch(id, () => {
   activeTab.value = 'chronicles'
+  stats.value = null
   loadPerson()
 })
 
@@ -302,73 +396,165 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="page">
-    <div class="header">
-      <button class="back-btn" @click="goBack">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
-      <h1 class="page-title">{{ person?.displayName || $t('common.loading') }}</h1>
+  <main class="arena-theme person-page">
+    <!-- Ambient pitch glow: pure CSS, transform/opacity only -->
+    <div class="pp-fx" aria-hidden="true">
+      <div class="fx-mow"></div>
+      <div class="fx-glow fx-glow--green"></div>
+      <div class="fx-glow fx-glow--gold"></div>
     </div>
 
-    <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
-    <EmptyState v-else-if="error" :title="error" :description="$t('person.loadErrorDescription')" />
-    <EmptyState v-else-if="!person" :title="$t('person.notFoundTitle')" :description="$t('person.notFoundDescription')" />
-    <template v-else>
-      <!-- Fixed Header Section -->
-      <div class="profile-header">
-        <div class="avatar-large" :class="{ 'has-img': !!person.avatarUrl }">
-            <img 
-              v-if="person.avatarUrl" 
-              :src="person.avatarUrl" 
-              class="avatar-img" 
-              @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; person!.avatarUrl = null }"
-            />
-            <span v-else>{{ person.displayName.charAt(0).toUpperCase() }}</span>
-            
-            <label v-if="canEdit" class="edit-avatar-btn">
-              {{ $t('person.changeAvatar') }}
-              <input type="file" @change="onAvatarChange" accept="image/*" style="display: none" />
-            </label>
-          </div>
-          <div class="profile-info">
-            <h2>
-              {{ person.displayName }}
-              <span v-if="person.isCaptain" class="captain-badge" :title="$t('people.captain')">👑</span>
-            </h2>
-            <div class="tags">
-              <span v-if="person.familyId" class="tag family">
+    <div class="pp-container">
+      <header class="pp-topbar rise d1">
+        <button class="pp-back" type="button" :aria-label="t('common.close')" @click="goBack">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+        <span class="pp-kicker">{{ $t('person.playerCard') }}</span>
+      </header>
+
+      <div v-if="loading" class="pp-status">{{ $t('common.loading') }}</div>
+      <EmptyState v-else-if="error" :title="error" :description="$t('person.loadErrorDescription')" />
+      <EmptyState v-else-if="!person" :title="$t('person.notFoundTitle')" :description="$t('person.notFoundDescription')" />
+      <template v-else>
+        <!-- ===== Pseudo-3D player card ===== -->
+        <section
+          ref="cardScene"
+          class="card-scene rise d2"
+          @pointermove="onCardPointerMove"
+          @pointerleave="resetTilt"
+        >
+          <div class="player-card" :class="{ 'is-live': tiltEnabled }" :style="cardTransform ? { transform: cardTransform } : undefined">
+            <div class="pc-frame" aria-hidden="true"></div>
+            <div class="pc-sheen" aria-hidden="true"></div>
+
+            <div class="pc-head">
+              <div class="pc-ovr">
+                <span class="pc-ovr-num">{{ overallRating }}</span>
+                <span class="pc-ovr-label">{{ $t('person.overall') }}</span>
+              </div>
+              <div class="pc-side">
+                <span v-if="person.team" class="pc-team" :class="person.team.toLowerCase()">
+                  {{ person.team === 'RED' ? $t('people.red') : $t('people.blue') }}
+                </span>
+                <span v-if="person.isCaptain" class="pc-captain" :title="$t('people.captain')">👑 {{ $t('people.captain') }}</span>
+              </div>
+            </div>
+
+            <div class="pc-avatar" :class="{ 'has-img': !!person.avatarUrl }">
+              <img
+                v-if="person.avatarUrl"
+                :src="person.avatarUrl"
+                class="pc-avatar-img"
+                :alt="person.displayName"
+                @error="(e) => { (e.target as HTMLImageElement).style.display = 'none'; person!.avatarUrl = null }"
+              />
+              <span v-else class="pc-initial">{{ personInitial }}</span>
+
+              <label v-if="canEdit" class="pc-avatar-edit">
+                {{ $t('person.changeAvatar') }}
+                <input type="file" @change="onAvatarChange" accept="image/*" style="display: none" />
+              </label>
+            </div>
+
+            <h2 class="pc-name">{{ person.displayName }}</h2>
+            <div class="pc-tags">
+              <span v-if="person.familyId" class="pc-tag">
                 {{ familiesStore.familyById[person.familyId] || $t('people.family') }}
               </span>
-              <span v-if="person.team" class="tag" :class="person.team.toLowerCase()">
-                {{ person.team === 'RED' ? $t('people.red') : $t('people.blue') }}
-              </span>
             </div>
-            <button v-if="canEdit" class="edit-profile-btn" @click="editingMember = person">
+
+            <!-- Hand-rolled SVG hexagon radar: no chart library -->
+            <svg
+              class="pc-radar"
+              :viewBox="`0 0 ${RADAR_SIZE} ${RADAR_SIZE}`"
+              role="img"
+              :aria-label="$t('people.stats')"
+            >
+              <polygon
+                v-for="(ring, i) in radarGridRings"
+                :key="`ring-${i}`"
+                :points="ring"
+                class="radar-ring"
+              />
+              <line
+                v-for="(axis, i) in radarAxes"
+                :key="`axis-${i}`"
+                :x1="RADAR_CENTER"
+                :y1="RADAR_CENTER"
+                :x2="axis.x"
+                :y2="axis.y"
+                class="radar-axis"
+              />
+              <polygon :points="radarValuePoints" class="radar-value" />
+              <circle
+                v-for="(dot, i) in radarValueDots"
+                :key="`dot-${i}`"
+                :cx="dot.x"
+                :cy="dot.y"
+                r="2.4"
+                class="radar-dot"
+              />
+              <text
+                v-for="label in radarLabels"
+                :key="`label-${label.key}`"
+                :x="label.x"
+                :y="label.y"
+                class="radar-label"
+                text-anchor="middle"
+                dominant-baseline="middle"
+              >{{ $t(`person.abilities.${label.key}`) }}</text>
+            </svg>
+
+            <button v-if="canEdit" class="pc-edit-btn" type="button" @click="editingMember = person">
               {{ $t('person.editProfile') }}
             </button>
           </div>
-        </div>
+        </section>
 
-      <!-- Dynamic Archive Section -->
-      <PersonTabs 
-        v-model:active-tab="activeTab"
+        <!-- ===== Career stats strip (GET /members/:id/stats) ===== -->
+        <section v-if="stats" class="stats-bar rise d3" :aria-label="$t('person.stats.title')">
+          <p class="stats-title">{{ $t('person.stats.title') }}</p>
+          <div class="stats-grid">
+            <div class="stat-cell">
+              <span class="stat-num">{{ stats.appearances }}</span>
+              <span class="stat-label">{{ $t('person.stats.appearances') }}</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-num">{{ stats.wins }}</span>
+              <span class="stat-label">{{ $t('person.stats.wins') }}</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-num stat-num--green">{{ winRatePercent }}%</span>
+              <span class="stat-label">{{ $t('person.stats.winRate') }}</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-num stat-num--gold">{{ stats.mvpCount }}</span>
+              <span class="stat-label">{{ $t('person.stats.mvp') }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Dynamic Archive Section ===== -->
+        <PersonTabs
+          class="rise d4"
+          v-model:active-tab="activeTab"
           :chronicles-count="chroniclesList.length"
           :media-count="person.mediaCount || 0"
           :works-count="person.worksCount || 0"
           :matches-count="person.matchesCount || 0"
         />
 
-        <div class="archive-content">
+        <div class="archive-content rise d4">
           <div v-if="activeTab === 'chronicles'">
-            <ChroniclesList 
-              :chronicles="chroniclesList" 
+            <ChroniclesList
+              :chronicles="chroniclesList"
               :can-delete="canDeleteChronicle"
               @delete="handleDeleteChronicle"
               @edit="editingChronicle = $event"
-              @select-work="openWorkReader" 
+              @select-work="openWorkReader"
             />
           </div>
 
@@ -383,7 +569,7 @@ onUnmounted(() => {
                 <div class="media-gallery">
                   <div v-for="item in group.items" :key="item.id" class="media-frame" @click="selectedMedia = item">
                     <img :src="mediaService.getMediaFileUrl(item.id)" :alt="$t('media.alt')" class="media-img" v-if="item.type === 'PHOTO'" loading="lazy" />
-                    <video :src="mediaService.getMediaFileUrl(item.id)" class="media-video" v-else-if="item.type === 'VIDEO'" controls preload="metadata"></video>
+                    <video :src="mediaService.getMediaFileUrl(item.id)" class="media-video" v-else-if="item.type === 'VIDEO'" controls preload="metadata" playsinline muted></video>
 
                     <div v-if="canDeleteMedia(item)" class="media-actions">
                       <button
@@ -415,37 +601,38 @@ onUnmounted(() => {
               v-model:query="worksSearchQuery"
             />
             <div class="divider-y"></div>
-            <WorksGridModule 
-              :works="filteredWorksList" 
-              group-by="month" 
+            <WorksGridModule
+              :works="filteredWorksList"
+              group-by="month"
               :can-delete="canDeleteWork"
               @delete="handleDeleteWork"
               @edit="editingWork = $event"
-              @select="openWorkReader" 
+              @select="openWorkReader"
             />
           </div>
 
           <!-- Matches Tab -->
           <div v-else-if="activeTab === 'matches'">
-            <MatchesList 
-              :matchesList="matchesList" 
-              groupBy="month" 
-              :highlightMvpId="id" 
+            <MatchesList
+              :matchesList="matchesList"
+              groupBy="month"
+              :highlightMvpId="id"
               :can-delete="canDeleteMatch"
               @delete="handleDeleteMatch"
               @edit="editingMatch = $event"
             />
           </div>
         </div>
-    </template>
+      </template>
 
-    <WorkReader 
-      :work="selectedWork" 
-      :loading="readerLoading" 
-      :can-delete="canDeleteWork"
-      @delete="handleDeleteWork"
-      @close="closeWorkReader" 
-    />
+      <WorkReader
+        :work="selectedWork"
+        :loading="readerLoading"
+        :can-delete="canDeleteWork"
+        @delete="handleDeleteWork"
+        @close="closeWorkReader"
+      />
+    </div>
   </main>
 
   <MediaEditModal
@@ -494,6 +681,8 @@ onUnmounted(() => {
           class="lightbox-media"
           controls
           autoplay
+          playsinline
+          muted
           @dblclick="selectedMedia = null"
         ></video>
         <div class="lightbox-hint">{{ $t('media.lightboxHint') }}</div>
@@ -518,48 +707,516 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.page {
+/* ============ Page-level arena tokens (never :root) ============ */
+.arena-theme {
+  --font-display: 'Anton', 'Inter', system-ui, sans-serif;
+  --arena-text: #eef3ee;
+  --arena-muted: rgba(238, 243, 238, 0.55);
+  --arena-faint: rgba(238, 243, 238, 0.32);
+  --arena-line: rgba(255, 255, 255, 0.09);
+  --arena-green: #3ddc84;
+  --arena-green-deep: #1f7a48;
+  --arena-gold: #e8c766;
+
+  /* Re-tone inherited editorial tokens so shared children
+     (PersonTabs, lists, empty states, dropdowns) read dark here */
+  --bg: #05080a;
+  --surface: #0a120d;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --text-h: var(--arena-text);
+  --text: rgba(238, 243, 238, 0.82);
+  --text-muted: var(--arena-muted);
+  --border: var(--arena-line);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  position: relative;
+  overflow: hidden;
+  min-height: 100dvh;
+  color: var(--arena-text);
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgba(232, 199, 102, 0.07), transparent 60%),
+    radial-gradient(1000px 720px at 8% 112%, rgba(31, 122, 72, 0.2), transparent 65%),
+    linear-gradient(180deg, #05080a 0%, #08130e 52%, #05080a 100%);
+}
+
+/* ============ Ambient FX (transform/opacity only) ============ */
+.pp-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-mow {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.022) 0 90px,
+    rgba(255, 255, 255, 0) 90px 180px
+  );
+}
+
+.fx-glow {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.fx-glow--green {
+  width: 62vmax;
+  height: 62vmax;
+  top: -24vmax;
+  left: -18vmax;
+  background: radial-gradient(closest-side, rgba(46, 180, 100, 0.18), transparent 70%);
+  animation: drift-green 26s ease-in-out infinite alternate;
+}
+
+.fx-glow--gold {
+  width: 48vmax;
+  height: 48vmax;
+  right: -16vmax;
+  bottom: -18vmax;
+  background: radial-gradient(closest-side, rgba(232, 199, 102, 0.1), transparent 70%);
+  animation: drift-gold 32s ease-in-out infinite alternate;
+}
+
+@keyframes drift-green {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(9vmax, 6vmax, 0); }
+}
+
+@keyframes drift-gold {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-7vmax, -5vmax, 0); }
+}
+
+/* ============ Layout ============ */
+.pp-container {
+  position: relative;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
-  padding: 16px;
+  padding-left: calc(16px + var(--safe-left));
+  padding-right: calc(16px + var(--safe-right));
+  padding-bottom: calc(3rem + var(--safe-bottom));
   box-sizing: border-box;
   overflow-x: hidden;
 }
-.header {
+
+.pp-topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 14px;
+  padding-top: calc(1rem + var(--safe-top));
+  padding-bottom: 1.25rem;
 }
-.back-btn {
-  background: none;
-  border: none;
+
+.pp-back {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--arena-line);
+  border-radius: 50%;
   cursor: pointer;
-  color: var(--text);
-  padding: 8px;
+  color: var(--arena-text);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background 0.2s;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.back-btn:hover {
-  background: var(--surface);
+
+.pp-back:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.12);
 }
-.page-title {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0;
+
+.pp-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--arena-green);
 }
-.loading, .error {
+
+.pp-kicker::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--arena-green), transparent);
+  flex-shrink: 0;
+}
+
+.pp-status {
   text-align: center;
   padding: 32px;
-  color: var(--text-muted);
+  color: var(--arena-muted);
 }
-.error {
-  color: var(--danger);
+
+/* ============ Pseudo-3D player card ============ */
+.card-scene {
+  perspective: 1200px;
+  margin-bottom: 1.5rem;
 }
+
+.player-card {
+  position: relative;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 1.4rem 1.4rem 1.6rem;
+  box-sizing: border-box;
+  border-radius: 18px;
+  border: 1px solid rgba(232, 199, 102, 0.5);
+  background:
+    radial-gradient(420px 200px at 85% -8%, rgba(232, 199, 102, 0.14), transparent 60%),
+    radial-gradient(360px 260px at 8% 108%, rgba(61, 220, 132, 0.12), transparent 65%),
+    linear-gradient(165deg, #0c1a12 0%, #08130e 45%, #05080a 100%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.player-card.is-live {
+  transition: transform 0.18s ease-out;
+}
+
+/* Touch devices (no hover): static micro-tilt instead of mouse follow */
+@media (hover: none) {
+  .player-card:not(.is-live) {
+    transform: rotateX(2deg) rotateY(-3deg);
+  }
+}
+
+/* Inner gold hairline frame (layered card face) */
+.pc-frame {
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(232, 199, 102, 0.28);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Moving sheen across the foil face, gated by reduced-motion below */
+.pc-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pc-sheen::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent
+  );
+  transform: translateX(-140%) skewX(-10deg);
+}
+
+.pc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pc-ovr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.pc-ovr-num {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  letter-spacing: 0.02em;
+  color: var(--arena-gold);
+  text-shadow: 0 2px 14px rgba(232, 199, 102, 0.3);
+}
+
+.pc-ovr-label {
+  margin-top: 2px;
+  font-family: var(--sans);
+  font-size: 0.58rem;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--arena-muted);
+}
+
+.pc-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.pc-team {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--arena-line);
+}
+
+.pc-team.red {
+  color: #ff8f8a;
+  border-color: rgba(255, 143, 138, 0.45);
+  background: rgba(255, 143, 138, 0.08);
+}
+
+.pc-team.blue {
+  color: #7cc4ff;
+  border-color: rgba(124, 196, 255, 0.45);
+  background: rgba(124, 196, 255, 0.08);
+}
+
+.pc-captain {
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--arena-gold);
+}
+
+.pc-avatar {
+  width: 128px;
+  height: 128px;
+  margin: 0.9rem auto 0;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 199, 102, 0.65);
+  background: linear-gradient(160deg, var(--arena-green-deep) 0%, #0a2316 70%);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(61, 220, 132, 0.18),
+    inset 0 0 0 4px rgba(5, 8, 10, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pc-avatar.has-img {
+  background: transparent;
+}
+
+.pc-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pc-initial {
+  font-family: var(--font-display);
+  font-size: 3.2rem;
+  color: var(--arena-text);
+  text-shadow: 0 2px 12px rgba(61, 220, 132, 0.35);
+}
+
+.pc-avatar-edit {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 10, 0.78);
+  color: #fff;
+  font-size: 0.7rem;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pc-avatar:hover .pc-avatar-edit,
+.pc-avatar:focus-within .pc-avatar-edit {
+  opacity: 1;
+}
+
+/* Coarse pointers have no hover: keep the edit affordance reachable */
+@media (hover: none) {
+  .pc-avatar-edit {
+    opacity: 1;
+  }
+}
+
+.pc-name {
+  margin: 0.9rem 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.9rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--arena-text);
+}
+
+.pc-tags {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 0.55rem;
+}
+
+.pc-tag {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--arena-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--arena-line);
+}
+
+/* ============ Hand-rolled SVG radar ============ */
+.pc-radar {
+  display: block;
+  width: min(78vw, 250px);
+  height: auto;
+  margin: 1rem auto 0;
+}
+
+.radar-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.radar-axis {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+
+.radar-value {
+  fill: rgba(61, 220, 132, 0.22);
+  stroke: var(--arena-green);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.radar-dot {
+  fill: var(--arena-gold);
+}
+
+.radar-label {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  fill: var(--arena-muted);
+  text-transform: uppercase;
+}
+
+.pc-edit-btn {
+  display: block;
+  margin: 1.1rem auto 0;
+  min-height: 44px;
+  padding: 0.5rem 1.4rem;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--arena-muted);
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pc-edit-btn:active {
+  transform: scale(0.96);
+  border-color: var(--arena-green);
+  color: var(--arena-green);
+}
+
+/* ============ Career stats strip ============ */
+.stats-bar {
+  max-width: 480px;
+  margin: 0 auto 1.75rem;
+  padding: 0.95rem 1.1rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid var(--arena-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  box-sizing: border-box;
+}
+
+.stats-title {
+  margin: 0 0 0.7rem;
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--arena-faint);
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stat-num {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--arena-text);
+}
+
+.stat-num--green {
+  color: var(--arena-green);
+}
+
+.stat-num--gold {
+  color: var(--arena-gold);
+}
+
+.stat-label {
+  font-family: var(--sans);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--arena-muted);
+  text-align: center;
+}
+
+/* ============ Archive area ============ */
 .archive-content {
   width: 100%;
   overflow-x: hidden;
@@ -574,117 +1231,7 @@ onUnmounted(() => {
   margin-bottom: 2rem;
   width: 100%;
 }
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 32px;
-}
-.avatar-large {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: var(--brand-2);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: bold;
-  position: relative;
-  overflow: hidden;
-}
-.avatar-large.has-img {
-  background: transparent;
-  padding: 0;
-}
-.avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.edit-avatar-btn {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  font-size: 0.7rem;
-  text-align: center;
-  padding: 4px 0;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.avatar-large:hover .edit-avatar-btn {
-  opacity: 1;
-}
-.captain-badge {
-  font-size: 1.5rem;
-  margin-left: 0.5rem;
-  vertical-align: middle;
-}
-.profile-info h2 {
-  margin: 0 0 12px 0;
-  font-size: 28px;
-}
-.tags {
-  display: flex;
-  gap: 12px;
-}
-.tag {
-  font-size: 14px;
-  padding: 4px 12px;
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.tag.red {
-  color: #e53e3e;
-  border-color: #fc8181;
-  background: #fff5f5;
-}
-.tag.blue {
-  color: #3182ce;
-  border-color: #63b3ed;
-  background: #ebf8ff;
-}
-.tag.family {
-  color: var(--text-muted);
-}
 
-.edit-profile-btn {
-  margin-top: 0.75rem;
-  background: transparent;
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-  padding: 0.4rem 1rem;
-  font-family: var(--sans);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.edit-profile-btn:hover {
-  border-color: var(--text-h);
-  color: var(--text-h);
-}
-
-.archive-section {
-  margin-top: 2rem;
-}
-.section-heading {
-  font-size: 1rem;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.5rem;
-}
 .media-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -720,33 +1267,52 @@ onUnmounted(() => {
   z-index: 10;
 }
 
-.media-frame:hover .media-actions {
+.media-frame:hover .media-actions,
+.media-frame:focus-within .media-actions {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .media-actions {
+    opacity: 1;
+  }
 }
 
 .edit-media-btn,
 .delete-media-btn {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(5, 8, 10, 0.72);
   color: white;
-  border: none;
-  border-radius: 4px;
-  width: 24px;
-  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   transition: transform 0.2s ease, background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .edit-media-btn:hover {
-  background: rgba(56, 142, 60, 0.9);
+  background: rgba(31, 122, 72, 0.9);
   transform: scale(1.1);
 }
 
 .delete-media-btn:hover {
-  background: rgba(229, 57, 53, 0.9);
+  background: rgba(153, 27, 27, 0.9);
   transform: scale(1.1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .edit-media-btn,
+  .delete-media-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+  }
 }
 
 /* Lightbox styles */
@@ -830,7 +1396,9 @@ onUnmounted(() => {
   right: 2rem;
   color: rgba(255, 255, 255, 0.9);
   background: rgba(0, 0, 0, 0.5);
-  padding: 0.5rem;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -866,5 +1434,41 @@ onUnmounted(() => {
   margin: 0;
 }
 
+/* ============ Entrance & motion gating ============ */
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 
+  .d1 { animation-delay: 0.05s; }
+  .d2 { animation-delay: 0.14s; }
+  .d3 { animation-delay: 0.24s; }
+  .d4 { animation-delay: 0.32s; }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .pc-sheen::after {
+    animation: sheen 7s linear infinite;
+  }
+
+  @keyframes sheen {
+    from { transform: translateX(-140%) skewX(-10deg); }
+    to { transform: translateX(380%) skewX(-10deg); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-glow {
+    animation: none;
+  }
+}
 </style>
