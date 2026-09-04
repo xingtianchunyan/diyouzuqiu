@@ -12,9 +12,18 @@ export interface OtpSendResponse {
   expiresIn: number
 }
 
+export interface CaptchaResponse {
+  id: string
+  question: string
+}
+
 export const authService = {
-  login(email: string, password: string) {
-    return apiClient.post<LoginResponse>('/auth/login', { email, password })
+  login(email: string, password: string, captchaId?: string, captchaAnswer?: string) {
+    return apiClient.post<LoginResponse>('/auth/login', { email, password, captchaId, captchaAnswer })
+  },
+
+  getCaptcha() {
+    return apiClient.get<CaptchaResponse>('/auth/captcha')
   },
 
   sendEmailOtp(email: string) {
