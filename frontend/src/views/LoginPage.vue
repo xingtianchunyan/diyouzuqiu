@@ -211,7 +211,10 @@ const handleSendCode = async () => {
     success.value = t('auth.codeSent')
     startCountdown()
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || t('auth.otpLoginFailed')
+    const errCode = err.response?.data?.error?.code
+    error.value = errCode === 'SEND_FAILED'
+      ? t('auth.sendFailed')
+      : err.response?.data?.error?.message || t('auth.otpLoginFailed')
   } finally {
     sendingCode.value = false
   }
@@ -257,6 +260,10 @@ const handleLogin = async () => {
       captchaRequired.value = true
       await fetchCaptcha()
       error.value = alreadyShown ? t('auth.captchaWrong') : t('auth.captchaRequired')
+    } else if (errCode === 'INVALID_CREDENTIALS') {
+      error.value = t('auth.invalidCredentials')
+    } else if (errCode === 'INVALID_OTP') {
+      error.value = t('auth.invalidOtp')
     } else {
       error.value = err.response?.data?.error?.message || t('auth.loginFailed')
     }

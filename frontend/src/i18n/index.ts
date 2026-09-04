@@ -24,7 +24,10 @@ const messages = {
       captchaLabel: '安全验证',
       captchaPlaceholder: '答案',
       captchaRefresh: '换一题',
-      captchaWrong: '安全验证答案不正确或已过期，请重试'
+      captchaWrong: '安全验证答案不正确或已过期，请重试',
+      invalidCredentials: '邮箱或密码不正确',
+      invalidOtp: '验证码不正确或已过期',
+      sendFailed: '验证码发送失败，请稍后重试'
     },
     common: {
       loading: '加载中...',
@@ -631,7 +634,10 @@ const messages = {
       captchaLabel: 'Security check',
       captchaPlaceholder: 'Answer',
       captchaRefresh: 'New question',
-      captchaWrong: 'Incorrect or expired security check answer, please try again'
+      captchaWrong: 'Incorrect or expired security check answer, please try again',
+      invalidCredentials: 'Incorrect email or password',
+      invalidOtp: 'Incorrect or expired verification code',
+      sendFailed: 'Failed to send the verification code, please try again later'
     },
     common: {
       loading: 'Loading...',
