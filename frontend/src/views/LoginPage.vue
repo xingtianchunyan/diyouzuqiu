@@ -62,7 +62,33 @@
             />
           </div>
 
-          <div v-else class="form-group">
+          <div v-if="mode === 'password' && captchaRequired" class="form-group">
+            <label for="captcha" class="form-label">
+              {{ $t('auth.captchaLabel') }}
+            </label>
+            <div class="otp-input-row">
+              <span class="captcha-question">{{ captchaQuestion }}</span>
+              <input
+                id="captcha"
+                v-model="captchaAnswer"
+                name="captcha"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                class="form-input otp-input"
+                :placeholder="$t('auth.captchaPlaceholder')"
+              />
+              <button
+                type="button"
+                class="otp-send-btn"
+                @click="fetchCaptcha"
+              >
+                {{ $t('auth.captchaRefresh') }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="mode === 'otp'" class="form-group">
             <label for="code" class="form-label">
               {{ $t('auth.verificationCode') }}
             </label>
@@ -133,6 +159,21 @@ const error = ref('')
 const success = ref('')
 const sendingCode = ref(false)
 const countdown = ref(0)
+const captchaRequired = ref(false)
+const captchaId = ref('')
+const captchaQuestion = ref('')
+const captchaAnswer = ref('')
+
+const fetchCaptcha = async () => {
+  captchaAnswer.value = ''
+  try {
+    const response = await authService.getCaptcha()
+    captchaId.value = response.data.id
+    captchaQuestion.value = response.data.question
+  } catch {
+    captchaQuestion.value = ''
+  }
+}
 
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
@@ -184,7 +225,17 @@ const handleLogin = async () => {
     let response
 
     if (mode.value === 'password') {
-      response = await authService.login(email.value, password.value)
+      if (captchaRequired.value && !captchaAnswer.value.trim()) {
+        error.value = t('auth.captchaRequired')
+        loading.value = false
+        return
+      }
+      response = await authService.login(
+        email.value,
+        password.value,
+        captchaRequired.value ? captchaId.value : undefined,
+        captchaRequired.value ? captchaAnswer.value.trim() : undefined
+      )
     } else {
       if (!code.value) {
         error.value = t('auth.codeRequired')
@@ -200,7 +251,15 @@ const handleLogin = async () => {
 
     router.push('/')
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || t('auth.loginFailed')
+    const errCode = err.response?.data?.error?.code
+    if (mode.value === 'password' && errCode === 'CAPTCHA_REQUIRED') {
+      const alreadyShown = captchaRequired.value
+      captchaRequired.value = true
+      await fetchCaptcha()
+      error.value = alreadyShown ? t('auth.captchaWrong') : t('auth.captchaRequired')
+    } else {
+      error.value = err.response?.data?.error?.message || t('auth.loginFailed')
+    }
   } finally {
     loading.value = false
   }
@@ -211,6 +270,7 @@ watch(mode, () => {
   success.value = ''
   password.value = ''
   code.value = ''
+  captchaAnswer.value = ''
 })
 </script>
 
@@ -337,6 +397,17 @@ watch(mode, () => {
 .otp-input-row {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
+}
+
+.captcha-question {
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-h);
+  white-space: nowrap;
+  padding: 0 0.5rem;
+  user-select: none;
 }
 
 .otp-input {

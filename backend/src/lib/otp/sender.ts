@@ -36,7 +36,14 @@ export const smtpSender: OtpSender = {
     const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587
     const user = process.env.SMTP_USER
     const pass = process.env.SMTP_PASS
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@diyou.test'
+    const rawFrom = process.env.SMTP_FROM
+    // QQ 等邮箱要求 MAIL FROM 是真实邮箱地址；若 SMTP_FROM 只是显示名（不含 <addr>），
+    // 自动拼成 "显示名 <SMTP_USER>"，避免 502 Invalid paramenters。
+    const from = rawFrom
+      ? rawFrom.includes('<')
+        ? rawFrom
+        : `${rawFrom} <${user}>`
+      : user || 'noreply@diyou.test'
 
     if (!host || !user || !pass) {
       throw new Error('SMTP not configured: set SMTP_HOST, SMTP_USER, SMTP_PASS')

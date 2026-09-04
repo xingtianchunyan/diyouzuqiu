@@ -19,7 +19,12 @@ const messages = {
       codeSent: '验证码已发送',
       otpLoginFailed: '验证码登录失败',
       codeRequired: '请输入验证码',
-      emailRequired: '请输入邮箱'
+      emailRequired: '请输入邮箱',
+      captchaRequired: '连续输错次数过多，请先完成下方安全验证',
+      captchaLabel: '安全验证',
+      captchaPlaceholder: '答案',
+      captchaRefresh: '换一题',
+      captchaWrong: '安全验证答案不正确或已过期，请重试'
     },
     common: {
       loading: '加载中...',
@@ -621,7 +626,12 @@ const messages = {
       codeSent: 'Verification code sent',
       otpLoginFailed: 'Email code login failed',
       codeRequired: 'Please enter the verification code',
-      emailRequired: 'Please enter your email'
+      emailRequired: 'Please enter your email',
+      captchaRequired: 'Too many failed attempts. Please complete the security check below',
+      captchaLabel: 'Security check',
+      captchaPlaceholder: 'Answer',
+      captchaRefresh: 'New question',
+      captchaWrong: 'Incorrect or expired security check answer, please try again'
     },
     common: {
       loading: 'Loading...',
